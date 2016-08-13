@@ -1,0 +1,12 @@
+# Human
+My first discord bot, made with the [discord.py](https://github.com/Rapptz/discord.py) wrapper
+
+Requirements:
+- Python 3.4+
+
+#Libraries
+- [discord](https://github.com/Rapptz/discord.py)
+- [Cleverbot](https://github.com/folz/cleverbot.py)
+- [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/bs4)
+- [PyYaml](https://pyyaml.org/)
+
