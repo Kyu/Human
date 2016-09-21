@@ -9,4 +9,6 @@ Requirements:
 - [Cleverbot](https://github.com/folz/cleverbot.py)
 - [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/bs4)
 - [PyYaml](https://pyyaml.org/)
+- [Markovify](https://github.com/jsvine/markovify)
+- [Gingerit](https://github.com/Azd325/gingerit)
 
