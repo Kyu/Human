@@ -1,0 +1,16 @@
+#Config name is config.yml
+#Server below is DiscordBots Server
+'110373943822540800':  # Server ID
+  clear: 100  # Amount cleared by default on clear command
+  disabled: []  #  Channels where the bot ignores everything
+  prefix: "'"   # Command prefix for this server
+  silent:  # Channels where bot ignores un-prefixed triggers
+  - '110373943822540800' 
+  - '110374153562886144'
+  - '116705171312082950'
+  - '117018340114825217'
+  - '132632676225122304'
+  - '113743192305827841'
+
+blacklist: []  # Global blacklist
+
