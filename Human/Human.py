@@ -402,8 +402,6 @@ async def blacklist(obj):
 
 @client.event
 async def on_message(message):
-    if message.channel.id != '142510428591882241':
-        return
     if message.author.id in bot.blacklist:
         return
     if message.server.id in bot.blacklist:
@@ -444,7 +442,7 @@ async def on_message(message):
     # *Triggers
     if message.content == client.user.mention:
         print(message.author.name + " mentioned you!")
-        await client.send_message(message.author, await bot.helptext().format(prefix))
+        await client.send_message(message.author, bot.helpText().format(prefix))
 
     if client.user.mention in message.content:
         await take_log(message)
@@ -508,7 +506,10 @@ async def on_message(message):
 
     # *Useful
     if message.content.lower().startswith(prefix + "help"):
-        await client.send_message(message.author, await bot.helptext().format(prefix))
+        msg = client.send_message(message.channel, 'Help Sent to {}!'.format(message.author.mention))
+        await client.send_message(message.author, bot.helpText().format(prefix))
+        await asyncio.sleep(15)
+        client.delete_message(msg)
 
     if message.content.lower().startswith(prefix + "suggestion"):
         if not args:
