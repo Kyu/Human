@@ -1,4 +1,5 @@
 #Config name is config.yml
+#Everything is automated by main file
 #Server below is DiscordBots Server
 '110373943822540800':  # Server ID
   clear: 100  # Amount cleared by default on clear command
