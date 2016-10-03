@@ -6,7 +6,7 @@
   disabled: []  #  Channels where the bot ignores everything
   prefix: "'"   # Command prefix for this server
   silent:  # Channels where bot ignores un-prefixed triggers
-  - '110373943822540800' 
+  - '110373943822540800'
   - '110374153562886144'
   - '116705171312082950'
   - '117018340114825217'
