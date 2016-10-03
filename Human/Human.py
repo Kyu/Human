@@ -34,7 +34,7 @@ class Bot:
         self.author = '@Yu#9162'
         self.library = 'discord.py'
         self.source = 'https://github.com/TheKyu/Human'
-        self.version = 'Beta0.5'
+        self.version = 'Beta0.7'
         self.config_name = 'config.yml'
         self.start = datetime.datetime.now()
         self.commandsrun = 0
