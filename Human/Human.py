@@ -17,6 +17,7 @@ import os
 from urllib.request import Request, urlopen
 import inspect
 
+start = datetime.datetime.now()
 
 class StartupErr(Exception):
     pass
@@ -33,7 +34,8 @@ class Bot:
         self.name = "Human"
         self.author = '@Yu#9162'
         self.library = 'discord.py'
-        self.source = 'https://github.com/TheKyu/Human'
+        self.source = 'https://github.com/Kyu/Human'
+        self.invite = "https://discordapp.com/oauth2/authorize?&client_id=210448501748924416&scope=bot&permissions=-1"
         self.version = 'Beta0.7'
         self.config_name = 'config.yml'
         self.start = datetime.datetime.now()
@@ -49,23 +51,27 @@ class Bot:
                          'whosaid', 'case', 'reverse', 'settings', 'setting',
                          'country', 'eval', 'grammar', 'meow', 'doggo', 'dog',
                          'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
-                         'mention', 'mentioned', 'info')
+                         'mention', 'mentioned', 'info', "invite")
         self.suggest_timeout = {}
         self.loadConvos()
         self.loadSettings()
+        self.rss = {}  # *Unused
 
     def boot(self):
         files = ['config.yml', 'todo.txt', 'convos.pk1']
         for file in files:
             if not os.path.exists(file):
                 open(file, 'w').close()
-        try:
-            os.makedirs('logs')
-        except OSError:
-            if os.path.exists('logs'):
-                pass
-            else:
-                raise
+
+        if os.path.exists('logs'):
+            pass
+        else:
+            try:
+                os.makedirs('logs')
+            except OSError:
+                raise StartupErr("logs folder")
+
+        return True
 
     def loadSettings(self):
         with open('config.yml', 'r') as config:
@@ -90,8 +96,9 @@ class Bot:
     Library: {1}
     Version: {2}
     Source: {3}
+    Invite: {4}
     Server: https://discord.gg/2MqkeeJ
-        '''.format(self.author, self.library, self.version, self.source)
+        '''.format(self.author, self.library, self.version, self.source, self.invite)
 
     def loadConvos(self):
         try:
@@ -160,6 +167,7 @@ class Bot:
 bot = Bot()
 parser = GingerIt()
 client = discord.Client()
+
 
 async def suggest_reset():
     while True:
@@ -538,6 +546,9 @@ async def on_message(message):
         await asyncio.sleep(15)
         client.delete_message(msg)
 
+    if message.content.lower().split()[0] == prefix + "invite":
+        await client.send_message(message.channel, bot.invite)
+
     if message.content.lower().split()[0] == prefix + 'info':
         await client.send_message(message.channel, bot.info())
 
@@ -845,8 +856,9 @@ async def on_ready():
     print(client.user.id)
     print("https://discordapp.com/oauth2/authorize?&client_id="+client.user.id + "&scope=bot&permissions=3688992")
     await client.send_message(discord.Object(id='222828628369604609'), "Bot Started")
+    print("Took {} to start".format(str(datetime.datetime.now() - start)))
     print('------')
     await suggest_reset()
 
-print("Starting...\n")
+print("Starting...")
 client.run('token')
