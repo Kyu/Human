@@ -2,7 +2,7 @@
 My discord bot user, made with the [discord.py](https://github.com/Rapptz/discord.py) wrapper
 
 Requirements:
-- Python 3.4+
+- Python 3.5+
 
 #Libraries
 - [discord.py](https://github.com/Rapptz/discord.py)

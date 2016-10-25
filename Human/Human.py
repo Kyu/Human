@@ -6,18 +6,20 @@ from bs4 import BeautifulSoup
 import markovify
 import yaml
 from gingerit.gingerit import GingerIt
-
+#  import feedparser
 
 
 import time  # *Switch all time to datetime
 import datetime
+import aiohttp
 import pickle
 import random
 import os
-from urllib.request import Request, urlopen
 import inspect
+import re
 
 start = datetime.datetime.now()
+
 
 class StartupErr(Exception):
     pass
@@ -36,22 +38,27 @@ class Bot:
         self.library = 'discord.py'
         self.source = 'https://github.com/Kyu/Human'
         self.invite = "https://discordapp.com/oauth2/authorize?&client_id=210448501748924416&scope=bot&permissions=-1"
-        self.version = 'Beta0.7'
+        self.version = 'Beta0.8'
         self.config_name = 'config.yml'
         self.start = datetime.datetime.now()
         self.commandsrun = 0
         self.lastsaid = {}
-        self.defaultprefix = "."  # *Find something better
+        self.defaultprefix = "."# *Find something better
+        self.setting_format = {"prefix": ".", "clear": 100, "silent": [],
+                               "disabled": [], "default_roles": [],
+                               "disabled_commands": [], "mod_log": ""}
         self.TIME_FORMAT = "%H:%M:%S"
         self.DATE_FORMAT = '%Y-%m-%d'
-        self.log_name = self.start.strftime('%Y-%m-%d-%H-%M-%S')
+        self.log_name = self.start.strftime('%Y-%m-%d-%H-%M-%S') + ".log"
+        self.log_dir = os.getcwd() + "/logs/" + self.log_name
         self.commands = ('purge', 'blacklist', 'reload', 'say', 'roll', 'c',
                          'flip', 'play', 'clear', 'py', 'stop',
                          'todo', 'bloc', 'suggestion', '8ball', 'stats',
                          'whosaid', 'case', 'reverse', 'settings', 'setting',
                          'country', 'eval', 'grammar', 'meow', 'doggo', 'dog',
                          'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
-                         'mention', 'mentioned', 'info', "invite")
+                         'mention', 'mentioned', 'info', "invite", "kick",
+                         "ban")
         self.suggest_timeout = {}
         self.loadConvos()
         self.loadSettings()
@@ -90,15 +97,37 @@ class Bot:
 
         return True
 
+    def update_server(self, server):
+        settings = {"prefix": self.defaultprefix, "clear": 100, "silent": [],
+                    "disabled": [], "default_roles": [],
+                    "disabled_commands": [], "mod_log": ""}
+
+        updated = []
+
+        for i in self.setting_format:
+            if i not in self.settings[server.id]:
+                self.settings[server.id][i] = settings[i]
+                updated.append(i)
+
+        self.reload_settings()
+
+        if updated:
+            return "Updated: {0} in {1.name}".format(", ".join(updated), server)
+        else:
+            return "Nothing to update in {0.name}".format(server)
+
+    def reload_settings(self):
+        with open(self.config_name, "w") as cfg:
+            yaml.dump(self.settings, cfg, default_flow_style=False)
+
     def info(self):
-        return '''
-    Author: {0}
-    Library: {1}
-    Version: {2}
-    Source: {3}
-    Invite: {4}
-    Server: https://discord.gg/2MqkeeJ
-        '''.format(self.author, self.library, self.version, self.source, self.invite)
+        return '''Author: {0.author}
+Library: {0.library}
+Version: {0.version}
+Source: {0.source}
+Invite: {0.invite}
+Server: https://discord.gg/2MqkeeJ
+        '''.format(self)
 
     def loadConvos(self):
         try:
@@ -123,46 +152,42 @@ class Bot:
 
     def helpText(self):
         return '''
-            Here are your commands!
-            The prefix for this server is `{0}`
+Here are your commands!
+The prefix for this Server: {1.name} is `{0}`
 
-            __**Level 0: Normal users**__
-            Repeat after me: {0}say `thing`
-            See who last used {0}say: `{0}whosaid`
-            Chatbot: {0}c `message`
-            Country info: {0}country <args>`[info, land, QOL, econ, loc, army]`
-            Roll a die: {0}roll `<optional number of sides>`
-            Flip a coin: {0}flip
-            Radio: {0}play `URL`
-            Magic 8-ball:{0}8ball `query`
-            BlocSimulator: {0}bloc
-            Stats: {0}stats
-            New Quote: {0}case `thing`
-            Reverse a sentence: {0}reverse `sentence`
-            View a quote: {0}case `thing` |also comes with [tell me about] `thing`|
-            See past mentions: {0}mentions `optional number`
+__**Level 0: Normal users**__
+Repeat after me: {0}say `thing`
+See who last used {0}say: `{0}whosaid`
+Chatbot: {0}c `message`
+Country info: {0}country <args>`[info, land, QOL, econ, loc, army]`
+Roll a die: {0}roll `<optional number of sides>`
+Flip a coin: {0}flip
+Radio: {0}play `URL`
+Magic 8-ball:{0}8ball `query`
+BlocSimulator: {0}bloc
+Stats: {0}stats
+Bot info: {0}info
+New Quote: {0}case `thing`
+Reverse a sentence: {0}reverse `sentence`
+View a quote: {0}case `thing` |also comes with [tell me about] `thing`|
+See past mentions: {0}mentions `optional number`
+Grammar checker: {0}grammar `thing` | Aliases : {0}g
+Invite link: {0}invite
 
 
 
-            __**Level 0: Server Mods**__
-            ChangeCommandPrefixes: {0}setprefix `newprefix`
-            Clear chat: {0}clear `<optional number, default is 100>` `optional User/id`
-            View Settings: {0}settings `optional arg[clear, silent, disabled, prefix]`
-            Change a setting: {0}setting `setting name` `value` | Do {0}setting `info` to view what you settings can change
-            Send a suggestion: {0}suggestion `suggestion`
+__**Level 0: Server Mods**__
+Clear chat: {0}clear `<optional number, default is 100>` `optional User/id`
+View Settings: {0}settings `optional arg[clear, silent, disabled, prefix]`
+Change a setting: {0}setting `setting name` `value` | Do {0}setting `info` to view what you settings can change
+Send a suggestion: {0}suggestion `suggestion`
+Kick a user: {0}kick `@User/userid` optional reason
+Ban a user: {0}kick `@User/userid` optional reason  | optional purge=n
 
-            Bot Discord:
-            https://discord.gg/2MqkeeJ
-            '''
+Bot Discord:
+https://discord.gg/2MqkeeJ
+'''
 
-    def responses(self, case):
-        cases = {'wew': 'lad', 'ayy': 'lmao', 'lmao': 'ayy', '/o/': '\\o\\',
-                 '\\o\\': '/o/', '\\o/': '/o\\', '/o\\': '\\o/',
-                 'oshit': 'waddup',
-                 'kek': 'Did you know that kek backwards is kek?',
-                 'cyka':  'Блять'}
-        if case in cases:
-            return cases[case]
 
 bot = Bot()
 parser = GingerIt()
@@ -174,14 +199,17 @@ async def suggest_reset():
         await asyncio.sleep(86400)
         bot.suggest_timeout = {}
 
+
 async def who_said(channel):
     try:
         return "{} made me do it!".format(bot.lastsaid[channel].mention)
     except KeyError:
         return ":x: The perpetrator has vanished :x:"
 
+
 async def sent_from(channel, name):
     bot.lastsaid[channel] = name
+
 
 async def correctGrammar(text):
     correctedgrammar = parser.parse(text)
@@ -212,18 +240,22 @@ async def fortune():
 
     return poss[random.randint(0, 19)]
 
+
 async def getDoggo():
     doggo = 'random.dog/ doggo'
     return doggo
+
 
 async def getKitty():
     kitty = 'random.cat/ kitty'
     return kitty
 
+
 async def save_convo(obj):
     with open('convos.pk1', 'wb') as output:
         pickle.dump(dict(obj), output, -1)
     return
+
 
 async def convo_manager(check):
     if check in bot.convos:
@@ -236,39 +268,61 @@ async def convo_manager(check):
 
 # *Log better
 async def take_log(message):
-    logdir = os.getcwd() + "\\logs\\"
+    logdir = os.getcwd() + "/logs/"
 
     try:
         if message.channel.is_private:
-            with open(logdir + bot.log_name + ".log", "a+", encoding='utf-8') as text_file:
-                print("[{0}] Private Message: {1} : ' {2} ' ".format(time.strftime(bot.TIME_FORMAT, time.localtime()), message.author.name, message.content), file=text_file)
+            with open(bot.log_dir,
+                      "a+", encoding='utf-8') as text_file:
+                print("[{0}] Private Message: {1} : ' {2} ' "
+                      .format(time.strftime(bot.TIME_FORMAT, time.localtime()),
+                              message.author.name, message.content),
+                      file=text_file)
 
-            print("[{0}] Private Message: {1} : ' {2} ' ".format(time.strftime(bot.TIME_FORMAT, time.localtime()), message.author.name, message.content))
+            print("[{0}] Private Message: {1} : ' {2} ' "
+                  .format(time.strftime(bot.TIME_FORMAT, time.localtime()),
+                          message.author.name, message.content))
 
         else:
-            with open(logdir + bot.log_name + ".log", "a+", encoding='utf-8') as text_file:
-                print("[{0}] {1} in  {2}:{3}: '{4}".format(time.strftime(bot.TIME_FORMAT, time.localtime()), message.author.name, message.channel.server.name, message.channel.name, message.content), file=text_file)
-            print("[{0}] {1} in  {2}:{3}: '{4}'".format(time.strftime(bot.TIME_FORMAT, time.localtime()), message.author.name, message.channel.server.name, message.channel.name, message.content))
+            with open(bot.log_dir,
+                      "a+", encoding='utf-8') as text_file:
+                print("[{0}] {1} in  {2}:{3}: '{4}"
+                      .format(time.strftime(bot.TIME_FORMAT,
+                              time.localtime()), message.author.name,
+                              message.channel.server.name,
+                              message.channel.name, message.content),
+                      file=text_file)
+            print("[{0}] {1} in  {2}:{3}: '{4}'"
+                  .format(time.strftime(bot.TIME_FORMAT, time.localtime()),
+                          message.author.name, message.channel.server.name,
+                          message.channel.name, message.content))
     except UnicodeEncodeError:
-        with open(logdir + bot.log_name + ".log", "a+", encoding='utf-8') as text_file:
-                print("[{0}] Private Message: {1} : ' {2} ' ".format(time.strftime(bot.TIME_FORMAT, time.localtime()), message.author.id, message.content), file=text_file)
+        with open(bot.log_dir + bot.log_name,
+                  "a+", encoding='utf-8') as text_file:
+                print("[{0}] Message UnicodeErr: {1} : ' {2} ' "
+                      .format(time.strftime(bot.TIME_FORMAT, time.localtime()),
+                              message.author.id, message.content),
+                      file=text_file)
 
 
 async def get_nation(url, arg):
     '''if url == "args":
         return `info, land, qol, econ, rep, army`
     '''
-
     NATION_ARGS = {"info": 0, "land": 1, "qol": 2, "econ": 3, "rep": 4,
                    "army": 5}
 
     if arg == "" or arg not in NATION_ARGS:
-        return "**Specify with one of the following arguements <info, land, qol, econ, rep, army>**"
+        return ("**Specify with one of the following arguments:"
+                " <info, land, qol, econ, rep, army>**")
     try:
-        req = Request(url, headers={'User-Agent': 'DiscordBot-Human'})
-        open_country = urlopen(req).read()
+        async with aiohttp.get(url) as req:
+            if req.status == 200:
+                open_country = await req.text()
         soup = BeautifulSoup(open_country, "html.parser")
-        table = soup.find_all("table", attrs={"class": "table table-striped table-condensed table-hover table-bordered"})
+        table = soup.find_all("table", attrs={"class": """table table-striped
+                                              table-condensed table-hover
+                                              table-bordered"""})
     except Exception as e:
         return ":x:{}:x:".format(str(e))
 
@@ -289,29 +343,28 @@ async def get_nation(url, arg):
             if "#" not in link.get('href'):
                 war_country += link.get('href')
 
-        return super_clean_table.replace("\n\n", "\n") + "\n" + "http://www.blocgame.com" + war_country
+        return (super_clean_table.replace("\n\n", "\n") +
+                "\n" + "http://www.blocgame.com" + war_country)
 
     return super_clean_table.replace("\n\n", "\n")
 
 
-async def bloc_speaks():
+async def bloc_speaks(prompt=""):
     try:
-        with open(os.path.dirname(os.getcwd()) + '/CelloBoy/BlocSpeaks.txt', 'r',
-                                                 encoding='utf-8') as f:
+        with open(os.getcwd() + '/BlocSim/BlocSpeaks.txt',
+                  'r', encoding='utf-8') as f:
             text = f.read()
-    except:
-        # Only here because this depends on a file only I have
+    except FileNotFoundError:
+        print("File not found")
         return
     text_model = markovify.Text(text)  # *, state_size=4)
     try:
-        '''
         if prompt:
-            sentence = text_model.make_sentence_with_start(tuple(prompt))
+            sentence = text_model.make_sentence_with_start(prompt)
             return sentence
         else:
-        '''
-        sentence = text_model.make_sentence()
-        return sentence
+            sentence = text_model.make_sentence()
+            return sentence
     except Exception as e:
         return (e)
 
@@ -325,35 +378,45 @@ Servers Joined: {2}
 Running Conversations: {3}
 '''.format(uptime, bot.commandsrun, servers, len(bot.convos))
 
+
 async def set(server, case, rule):
     cases = {'prefix': 'The command prefix for this server',
              'clear': 'How much messages the clear command removes by default',
              'silent': 'Channels where the bot only responds to commands',
-             'disabled': 'Channels where the bot doesn\'t talk at all'}
+             'disabled': 'Channels where the bot doesn\'t talk at all',
+             'default_roles': "The role(s) new users automatically get",
+             "disabled_commands": "Commands disabled on the server",
+             "mod_log": "Channel where the bot logs mod actions"}
+            # "bot_commanders": "Users able to do bot level commands"}
 
     if case == 'info':
-        if type(rule) is str:
+        if type(rule) is str and rule:
             return cases[rule]
         else:
-            return "You can check for {}".format(", ".join(cases))
+            return "You can check for {} ".format(", ".join(cases))
 
-    if rule is None:
+    if not rule:
         return "You need to enter what you want the setting to be changed to!"
+
+    if case not in cases:
+        return "Invalid setting!"
 
     with open(bot.config_name, 'r') as f:
         config = yaml.load(f)
-
+    # TODO PREFIX
     if server.id in config:
-        if case == 'prefix':
+        if case == 'mod_log' or case == 'prefix':
             if type(rule) is str:
                 config[server.id][case] = rule
             else:
-                return "Enter a String"
+                return "Invalid setting"
+
         if case == 'clear':
             if rule.isdigit():
                 config[server.id][case] = int(rule)
             else:
                 return "{} is not a number".format(rule)
+
         if case == 'silent' or case == 'disabled':
             try:
                 rule = rule.id
@@ -362,29 +425,48 @@ async def set(server, case, rule):
             if rule.isdigit():
                 if rule in config[server.id][case]:
                     config[server.id][case].remove(rule)
-                    what = 'removed from'
+                    action = 'removed from'
                 else:
                     config[server.id][case].append(rule)
-                    what = 'added to'
+                    action = 'added to'
             else:
                 return "Invalid rule {}".format(rule)
+        if (case == 'silent' or case == 'disabled'
+                or case == 'default_roles' or case == 'disabled_commands'):
+            if type(rule) is str:
+                try:
+                    if rule in config[server.id][case]:
+                        config[server.id][case].remove(rule)
+                        action = 'removed from'
+                    else:
+                        config[server.id][case].append(rule)
+                        action = "added to"
+                except KeyError:
+                    config[server.id][case] = [rule]
+                    action = "created for"
+            else:
+                return "Enter a valid setting"
     else:
         await create_server(server)
         case = 'create'
-        return "Server rules have just been created. Do {}settings to view them".format(bot.defaultprefix)
+        return """Server rules have just been created. Do {}settings to view them
+        """.format(bot.defaultprefix)
     with open(bot.config_name, "w") as cfg:
         yaml.dump(config, cfg, default_flow_style=False)
         bot.loadSettings()
 
-    if case == 'prefix':
-        return "Prefix set to {}".format(bot.settings[server.id][case])
+    if case == 'prefix' or case == 'mod_log':
+        return "{0} set to {1}".format(case, bot.settings[server.id][case])
+
     if case == 'clear':
         return "Clear amount set to {}".format(bot.settings[server.id][case])
-    return '{0} {1} {2}list'.format(rule, what, case)
+
+    return '{0} {1} {2} list'.format(rule, action, case)
+
 
 async def create_server(server):
     cfg_name = 'config.yml'
-    default_cfg = {server.id: {"prefix": bot.defaultprefix, "clear": 100, 'silent': [], 'disabled': []}}
+    default_cfg = {server.id: bot.setting_format}
 
     with open(cfg_name, 'r') as f:
         config = yaml.load(f)
@@ -398,25 +480,8 @@ async def create_server(server):
             bot.loadSettings()
             return
     except TypeError as e:
-        print(e)
-
-
-async def updatee():
-    return 1 + 1
-
-
-async def update_prefix(server, prefix):
-    with open("config.yml") as f:
-        list_doc = yaml.load(f)
-
-    if list_doc[server.id]:
-        list_doc[server.id]['prefix'] = prefix
-    else:
-        await create_server(server)
-        await update_prefix(server, prefix)
-
-    with open("config.yml", "w") as f:
-        yaml.dump(list_doc, f, default_flow_style=False)
+        print("Error on creating server: {}"
+              .format(type(e).__name__ + ': ' + str(e)))
 
 
 async def blacklist(obj):
@@ -439,50 +504,62 @@ async def on_message(message):
     if message.author.id in bot.blacklist:
         return
 
-    if message.server.id in bot.blacklist:
-        return
+    prefix = bot.defaultprefix
 
     if not message.channel.is_private:
+        if message.server.id in bot.blacklist:
+            return
+        if message.channel.id in bot.settings[message.server.id]['disabled']:
+            return
         if message.server.id not in bot.settings:
             await create_server(message.server)
 
-    if message.channel.id in bot.settings[message.server.id]['disabled']:
+        prefix = bot.settings[message.server.id]['prefix']
+
+    if message.author == client.user:
+        await take_log(message)
+
+        if (message.content.count('\n') >= 10 and
+                not message.channel.is_private):
+            temp_msg = message
+            warn_msg = await client.send_message(message.channel,
+                                                 ("^ That message will be "
+                                                  "deleted in 30s for "
+                                                  "being too long. This an "
+                                                  "an experimental feature as "
+                                                  "not to clog chat "))
+            await asyncio.sleep(5)
+            await client.delete_message(warn_msg)
+            await asyncio.sleep(25)
+            await client.delete_message(temp_msg)
         return
 
     if message.author.bot:
         return
 
-    if not message.channel.is_private:
-        prefix = bot.settings[message.server.id]['prefix']
-    else:
-        prefix = bot.defaultprefix
-
     for i in bot.commands:
-        if message.content.startswith(prefix + i):
-            args = Args(message.content.split()[1:]) if message.content.split()[1:] else None
+        if message.content.lower().split()[0] == prefix + i:
+            if i in bot.settings[message.server.id]["disabled_commands"]:
+                return
+            args = (Args(message.content.split()[1:])
+                    if message.content.split()[1:] else None)
             bot.commandsrun += 1
             await take_log(message)
-
-    if message.author == client.user:
-        if message.content.count('\n') >= 10 and not message.channel.is_private:
-            temp_msg = message
-            warn_msg = await client.send_message(message.channel, "^ That message will be deleted in 100s for being too long. This is an experimental feature as not to clog chat")
-            await asyncio.sleep(100)
-            await client.delete_message(warn_msg)
-            await client.delete_message(temp_msg)
-        return
 
     # *Triggers
     if message.content == client.user.mention:
         print(message.author.name + " mentioned you!")
-        await client.send_message(message.author, bot.helpText().format(prefix))
+        await client.send_message(message.author,
+                                  bot.helpText().format(prefix, message.server)
+                                  )
 
     if client.user.mention in message.content:
         await take_log(message)
 
-    if message.content.lower().split()[0] == (prefix + '8ball'):
+    if message.content.lower().split()[0] == prefix + '8ball':
         if not args:
-            await client.send_message(message.channel, "Actually there are only 7 dragon balls")
+            await client.send_message(message.channel,
+                                      "Actually there are only 7 dragon balls")
             return
         await client.send_message(message.channel, await fortune())
 
@@ -490,24 +567,37 @@ async def on_message(message):
         if args is None:
             return
         await sent_from(message.channel.id, message.author)
-        await client.send_message(message.channel, bytes(message.content.replace(prefix+'say', "", 1), "utf-8").decode("unicode_escape"))
+        await client.send_message(message.channel,
+                                  message.content.replace(prefix + "say", "", 1
+                                                          ))
 
     if message.content.lower().split()[0] == prefix + 'reverse':
-        await client.send_message(message.channel, '\u202e{}'.format(await args.toString()))
+        await client.send_message(message.channel,
+                                  '\u202e{}'.format(await args.toString()))
 
     if message.content.lower().split()[0] == prefix + "whosaid":
-        await client.send_message(message.channel, await who_said(message.channel.id))
+        await client.send_message(message.channel,
+                                  await who_said(message.channel.id))
 
     if message.content.lower().split()[0] == prefix + "flip":
         if random.choice([0, 1]):
-            await client.send_message(message.channel, "You flipped for Heads!")
+            await client.send_message(message.channel,
+                                      "You flipped for Heads!")
         else:
-            await client.send_message(message.channel, "You flipped for Tails!")
+            await client.send_message(message.channel,
+                                      "You flipped for Tails!")
 
-    if message.content.lower().split()[0] == prefix + 'grammar' or message.content.lower().split()[0] == prefix + 'g':
-        msg = await client.send_message(message.channel, "*{}*".format(await args.toString()))
+    if (message.content.lower().split()[0] == prefix + 'grammar' or
+            message.content.lower().split()[0] == prefix + 'g'):
+
+        msg = await client.send_message(message.channel, "*{}*"
+                                        .format(await args.toString()))
+
         corrected = await correctGrammar(await args.toString())
-        await client.edit_message(msg, "*{0}* :arrow_right: **{1}**".format(msg.content, corrected['result']))
+
+        await client.edit_message(msg, "*{0}* :arrow_right: **{1}**"
+                                       .format(msg.content,
+                                               corrected['result']))
 
     # *Add text randomnisation
     # *remove max, change message
@@ -518,33 +608,51 @@ async def on_message(message):
                 if int(args[0]) >= 1:
                     roll = 120 if int(args[0]) >= 120 else int(args[0])
             except ValueError:
-                await client.send_message(message.channel, " I said **_number of sides_**\nDo you even know what a number is {}?".format(message.author.mention))
+                await client.send_message(message.channel,
+                                          ("I said **_number of sides_**\nDo "
+                                           "you even know what a number is {}?"
+                                           .format(message.author.mention)))
                 return
-        await client.send_message(message.channel, "Rolled a {0}".format(random.randint(1, roll)))
+        await client.send_message(message.channel,
+                                  "Rolled a {0}".format(random.randint(1, roll)
+                                                        ))
 
-    if message.content.lower().split()[0] == prefix + 'c ':
+    if message.content.lower().split()[0] == prefix + 'c':
         await client.send_typing(message.channel)
         try:
             c = await convo_manager(message.author)
-            await client.send_message(message.channel, c.ask(await args.toString()))
+            await client.send_message(message.channel,
+                                      c.ask(await args.toString()))
             await save_convo(bot.convos)
         except UnicodeEncodeError as e:
-            await client.send_message(message.channel, "I don't really like emoji atm")
+            await client.send_message(message.channel,
+                                      "I don't really like emoji atm")
         except ConnectionError:
-            await client.send_message(message.channel, ":x: Oops something went wrong! Is the bot server down?")
+            await client.send_message(message.channel,
+                                      (":x: Oops something went wrong! "
+                                       "Is the bot server down?"))
 
     if message.content.lower().split()[0] == prefix + 'bloc':
-        # *prompt = ""
-        # if args:
-            # prompt = await stringify(args)
+        if args:
+            if len(args) > 2:
+                await client.send_message(message.channel,
+                                          ":x:Prompt can only be 1 or 2 words long:x:")
+                return
+            prompt = await args.toString()
+            await client.send_message(message.channel,
+                                      await bloc_speaks(prompt=prompt))
+            return
         await client.send_message(message.channel, await bloc_speaks())
-
     # *Useful
     if message.content.lower().split()[0] == prefix + 'help':
-        msg = client.send_message(message.channel, 'Help Sent to {}!'.format(message.author.mention))
-        await client.send_message(message.author, bot.helpText().format(prefix))
+        msg = await client.send_message(message.channel,
+                                        """Help Sent to {}!"""
+                                        .format(message.author.mention))
+        await client.send_message(message.author,
+                                  bot.helpText()
+                                  .format(prefix, message.server))
         await asyncio.sleep(15)
-        client.delete_message(msg)
+        await client.delete_message(msg)
 
     if message.content.lower().split()[0] == prefix + "invite":
         await client.send_message(message.channel, bot.invite)
@@ -555,28 +663,43 @@ async def on_message(message):
     if message.content.lower().split()[0] == prefix + 'ping':
         pong = await client.send_message(message.channel, "Ow!")
         ping = pong.timestamp - message.timestamp
-        await client.edit_message(pong, "Response took 0{}s".format((str(ping).split(':')[2]).strip('0')))
+        await client.edit_message(pong,
+                                  "Response took 0{}s"
+                                  .format((str(ping).split(':')[2])
+                                          .strip('0')))
 
     if message.content.lower().split()[0] == prefix + "suggestion":
         if not args:
-            await client.send_message(message.channel, "Do nothing is a great suggestion. I'll do that all day")
+            await client.send_message(message.channel,
+                                      ("Do nothing is a great suggestion. "
+                                       "I'll do that all day"))
             return
 
         try:
             if bot.suggest_timeout[message.author.id] >= 5:
-                await client.send_message(message.channel, "Enough suggestions for today {}.".format(message.author.mention))
+                await client.send_message(message.channel,
+                                          "Enough suggestions for today {}."
+                                          .format(message.author.mention))
                 return
         except KeyError:
             bot.suggest_timeout[message.author.id] = 1
 
         bot.suggest_timeout[message.author.id] += 1
         with open("todo.txt", "a") as todofile:
-            print("[Suggestion from]{0}: {1}".format(message.author.name, await args.toString()), file=todofile)
+            print("[Suggestion from]{0}: {1}"
+                  .format(message.author.name, await args.toString()),
+                  file=todofile)
 
-    if message.content.lower().split()[0] == prefix + 'cat' or message.content.lower().split()[0] == prefix + 'meow' or message.content.lower().split()[0] == prefix + 'kitten' or message.content.lower().split()[0] == prefix + 'kitty':
+    if (message.content.lower().split()[0] == prefix + 'cat' or
+            message.content.lower().split()[0] == prefix + 'meow' or
+            message.content.lower().split()[0] == prefix + 'kitten' or
+            message.content.lower().split()[0] == prefix + 'kitty'):
         await client.send_message(message.channel, await getKitty())
 
-    if message.content.lower().split()[0] == prefix + 'pupper' or message.content.lower().split()[0] == prefix + 'doggo' or message.content.lower().split()[0] == prefix + 'dog' or message.content.lower().split()[0] == prefix + 'puppy':
+    if (message.content.lower().split()[0] == prefix + 'pupper' or
+            message.content.lower().split()[0] == prefix + 'doggo' or
+            message.content.lower().split()[0] == prefix + 'dog' or
+            message.content.lower().split()[0] == prefix + 'puppy'):
         await client.send_message(message.channel, await getDoggo())
 
     # *Finish this
@@ -592,93 +715,187 @@ async def on_message(message):
             try:
                 args[1]
             except IndexError:
-                await client.send_message(message.channel, "Specify with an arguement `<info, land, qol, econ, rep, army>`" )
+                await client.send_message(message.channel,
+                                          "Specify with an argument `<info, land, qol, econ, rep, army>`")
                 return
         else:
-            await client.send_message(message.channel, "I need a country url here")
+            await client.send_message(message.channel,
+                                      "I need a country url here")
             return
 
         try:
             if m.isdigit():
                 fullm = "http://blocgame.com/stats.php?id=" + m
                 info = await get_nation(fullm, args[1])
-                await client.send_message(message.channel, "Getting info from http://blocgame.com/stats.php?id=" + m + "\n" +info)
+                await client.send_message(message.channel,
+                                          "Getting info from http://blocgame.com/stats.php?id=" +
+                                          m + "\n" + info)
             elif "blocgame.com/stats.php?id=" in m:
                 info = await get_nation(m, args[1])
-                await client.send_message(message.channel, "Getting info from "+ m + "\n" + info)
+                await client.send_message(message.channel,
+                                          "Getting info from " +
+                                          m + "\n" + info)
             else:
-                await client.send_message(message.channel, "Bad nation link/number")
+                await client.send_message(message.channel,
+                                          "Bad nation link/number")
         except IndexError:
-            await client.send_message(message.channel, "That nation does not exist")
+            await client.send_message(message.channel,
+                                      "That nation does not exist")
 
     if message.content.lower().split()[0] == prefix + "play":
-        await client.send_message(message.channel, ":x:Disabled due to bandwith issues")
+        await client.send_message(message.channel,
+                                  ":x:Disabled due to bandwith issues")
 
     if message.content.lower().split()[0] == prefix + "stats":
         await client.send_message(message.channel, await stats())
 
-    if message.content.lower().split()[0] == prefix + 'mentions' or message.content.lower().split()[0] == prefix + 'mentioned':
+    if (message.content.lower().split()[0] == prefix + 'mentions' or
+            message.content.lower().split()[0] == prefix + 'mentioned'):
         try:
             n = int(args[0]) if args else 1000
-        except:
+        except ValueError:
             await client.send_message(message.channel, "Invalid argument!")
             return
+        finally:
+            n = 2000 if n > 1999 else n
+
         mentions = []
+
         async for msg in client.logs_from(message.channel, limit=n):
-            if message.author.mentioned_in(msg):#or other things
-                mentions.append("`{0}:{1}` |`{2}` at `{3}UTC`\n```css\n{4}: {5}```\n".format(msg.server, msg.channel, ((str(msg.timestamp).split('.'))[0]).split()[0], ((str(msg.timestamp).split('.'))[0]).split()[1], msg.author, msg.clean_content))
+            if message.author.mentioned_in(msg):  # or other things
+                mentions.append(
+                    "`{0}:{1}` |`{2}` at `{3}UTC`\n```css\n{4}: {5}```\n"
+                    .format(msg.server, msg.channel,
+                            ((str(msg.timestamp).split('.'))[0]).split()[0],
+                            ((str(msg.timestamp).split('.'))[0]).split()[1],
+                            msg.author, msg.clean_content))
         if mentions:
             mentions = Args(mentions)
-            await client.send_message(message.author, await mentions.toString())
+            await client.send_message(message.author,
+                                      await mentions.toString())
         else:
-            await client.send_message(message.channel, 'There were no mentions in the past {} messages'.format(n))
+            await client.send_message(message.channel,
+                                      'There were no mentions in the past {} messages'
+                                      .format(n))
 
     # *Mods
     if message.content.lower().split()[0] == prefix + "kick":
         if not message.channel.permissions_for(message.author).kick_members:
-            await client.send_message(message.channel, "You don't have permission!")
+            await client.send_message(message.channel,
+                                      "You don't have permission!")
             return
 
         if not message.channel.permissions_for(message.author).kick_members:
-            await client.send_message(message.channel, "I don't have permission!")
+            await client.send_message(message.channel,
+                                      "I don't have permission!")
             return
 
         if not args:
-            await client.send_message(message.channel, "No argument!")
+            await client.send_message(message.channel,
+                                      ("No argument! Use {}kick @user "
+                                       "`optional reason`"))
+            return
+        try:
+            to_remove = message.server.get_member(
+                        re.findall(r'<@!?([0-9]+)>', args[0])[0])
+        except IndexError:
+            await client.send_message(message.channel, "User not found")
             return
 
-        #await client.kick(user.mentioned_in(message))
+        try:
+            await client.kick(to_remove)
+        except discord.errors.Forbidden:
+            await client.send_message(message.channel, "Could not kick user {}"
+                                                       .format(str(to_remove)))
+            return
 
-        if len(message.content.split()) > 1:
-            reason = message.author.name + "Kicked you for: " + " ".join(message.content.split()[2:])
+        if len(args) > 1:
+            reason = "{0} Kicked: {1}".format(str(to_remove),
+                                              await Args(args[1:]).toString())
         else:
-            reason = ""
+            reason = '{0} Kicked: No reason given'.format(str(to_remove))
 
-        for i in args:
-            await client.send_message(message.channel, i)
+        await client.send_message(message.channel, reason)
+
+    if message.content.lower().split()[0] == prefix + "ban":
+        if not message.channel.permissions_for(message.author).ban_members:
+            await client.send_message(message.channel,
+                                      "You don't have permission!")
+            return
+
+        if not message.channel.permissions_for(message.author).ban_members:
+            await client.send_message(message.channel,
+                                      "I don't have permission!")
+            return
+
+        if not args:
+            await client.send_message(message.channel,
+                                      ("No argument! Use {}ban @user "
+                                       "`optional reason`"))
+            return
+
+        try:
+            to_remove = message.server.get_member(
+                        re.findall(r'<@!?([0-9]+)>', args[0])[0])
+        except IndexError:
+            await client.send_message(message.channel, "User not found")
+            return
+        if 'purge=' in message.content.lower():
+            for i in args:
+                if 'purge=' in i:
+                    try:
+                        purge = int(i.replace("purge=", ""))
+                        end = args.index(i)
+                    except ValueError:
+                        await client.send_message(message.server,
+                                                  "Invalid purge setting")
+                        return
+        else:
+            purge = 0
+            end = len(args)
+
+        try:
+            await client.ban(to_remove, delete_message_days=purge)
+        except discord.errors.Forbidden:
+            await client.send_message(message.channel, "Could not ban user {}"
+                                                       .format(str(to_remove)))
+            return
+
+        if len(args) > 1:
+            reason = "{0} Banned: {1}".format(str(to_remove),
+                                              await Args(args[1:end]).toString())
+        else:
+            reason = '{0} Banned: No reason given'.format(str(to_remove))
+
+        await client.send_message(message.channel, reason)
 
     # *Make this section more user friendly
-    if message.channel.permissions_for(message.author).manage_server or message.author.id == '142510125255491584':
+    if (message.channel.permissions_for(message.author).manage_server
+            or message.author.id == '142510125255491584'):
         if message.content.lower().split()[0] == prefix + 'settings':
             if args is None:
-                pass  # *Show all settings
+                return  # *Show all settings
             else:
                 try:
                     await client.send_message(message.channel, bot.settings[message.server.id][args[0]])
                 except KeyError:
-                    await client.send_message(message.channel, "Invalid setting argument")
+                    await client.send_message(message.channel,
+                                              "Invalid setting argument")
             return
 
         if message.content.lower().split()[0] == prefix + 'setting':
             if args is None:
-                await client.send_message(message.channel, "Use {}setting info to see what you can set".format(prefix))
+                await client.send_message(message.channel,
+                                          "Use {}setting info to see what you can set"
+                                          .format(prefix))
                 return
             try:
-                await client.send_message(message.channel, await set(message.server, args[0], args[1]))
+                await client.send_message(message.channel, await set(message.server, args[0], await Args(args[1:]).toString()))
             except IndexError:
                 await client.send_message(message.channel, await set(message.server, args[0], message.channel))
 
-    if message.channel.permissions_for(message.author).manage_server or message.author.id == '142510125255491584':
+    if (message.channel.permissions_for(message.author).manage_server or
+            message.author.id == '142510125255491584'):
         if message.content.lower().split()[0] == prefix + 'purge':
             deleted = 0
             num = bot.settings[message.server.id]['clear']
@@ -695,36 +912,43 @@ async def on_message(message):
                     deleted += 1
 
             if deleted:
-                msg = await client.send_message(message.channel, "Deleted {} of my messages".format(deleted))
+                msg = await client.send_message(message.channel,
+                                                "Deleted {} of my messages"
+                                                 .format(deleted))
                 await asyncio.sleep(10)
                 await client.delete_message(msg)
 
         if message.content.lower().split()[0] == prefix + "clear":
-            if not message.channel.permissions_for(message.author).manage_server:
-                if message.author.id != '142510125255491584':
-                    await client.send_message(message.channel, "No permission!")
-                    return
-
             deleted = 0
+
             try:
-                num = int(args[0]) if args else bot.settings[message.server.id]['clear']
+                num = int(args[0])
             except ValueError:
-                await client.send_message(message.channel, "Invalid arg {}".format(args[0]))
+                await client.send_message(message.channel, "Invalid arg {}"
+                                          .format(args[0]))
                 return
-            num = 10000 if num > 10000 else num
+            except IndexError:
+                num = bot.settings[message.server.id]['clear']
+            finally:
+                num = 10000 if num > 9999 else num
+
             if args and len(args) >= 2:
-                args[1] = args[1].replace("@", "").replace("<", "").replace(">", "")
-                targ = message.server.get_member_named(args[1])
+                to_delete = message.server.get_member(
+                            re.findall(r'<@!?([0-9]+)>', args[1])[0])
                 async for msg in client.logs_from(message.channel, limit=num):
-                    if msg.author == targ:
+                    if msg.author == to_delete:
                         await client.delete_message(msg)
+                        deleted += 1
             else:
                 async for msg in client.logs_from(message.channel, limit=num):
                     await client.delete_message(msg)
                     deleted += 1
             if deleted:
-                msg = await client.send_message(message.channel, "{0} has Deleted {1} messages!".format(message.author.mention, deleted))
-                await asyncio.sleep(10)
+                msg = await client.send_message(message.channel,
+                                                "{0} has Deleted {1} messages!"
+                                                .format(message.author.mention,
+                                                        deleted))
+                await asyncio.sleep(15)
                 await client.delete_message(msg)
 
     # *Owner
@@ -737,7 +961,7 @@ async def on_message(message):
             await client.send_message(message.channel, ':ok_hand:')
 
         if message.content.lower().split()[0] == prefix + 'reload':
-            bot.loadSettings()
+            await bot.reload_settings()
             await client.send_message(message.channel, "Reloaded")
 
         if message.content.lower().split()[0] == prefix + "todo":
@@ -752,13 +976,17 @@ async def on_message(message):
 
         if message.content.lower().split()[0] == prefix + "eval":
             python = '```py\n{}\n```'
-            cmd = bytes(message.content.replace(prefix+'eval', "", 1), "utf-8").decode("unicode_escape")
+            cmd = bytes(message.content
+                        .replace(prefix + 'eval', "", 1),
+                                 "utf-8").decode("unicode_escape")
             try:
                 result = eval(cmd)
                 if inspect.isawaitable(result):
                     result = await result
             except Exception as e:
-                await client.send_message(message.channel, python.format(type(e).__name__ + ': ' + str(e)))
+                await client.send_message(message.channel,
+                                          python.format(type(e).__name__ +
+                                                        ': ' + str(e)))
                 return
 
             await client.send_message(message.channel, python.format(result))
@@ -771,7 +999,9 @@ async def on_message(message):
                 if inspect.isawaitable(result):
                     result = await result
             except Exception as e:
-                await client.send_message(message.channel, python.format(type(e).__name__ + ': ' + str(e)))
+                await client.send_message(message.channel,
+                                          python.format(type(e).__name__ +
+                                                        ': ' + str(e)))
                 return
             await client.send_message(message.channel, python.format(result))
 
@@ -784,7 +1014,10 @@ async def on_message(message):
 
     # *Regex when
     if "ruka" in message.content.lower():
-        await client.send_message(message.channel, "_Did you mean_: {}".format(message.content.lower().replace("ruka", "Nuka")))
+        await client.send_message(message.channel,
+                                  "_Did you mean_: {}"
+                                  .format(message.content.lower()
+                                          .replace("ruka", "Nuka")))
 
     if 'oshit' in message.content.lower():
         if 'OSHIT' in message.content:
@@ -793,24 +1026,31 @@ async def on_message(message):
 
         await client.send_message(message.channel, "waddup")
 
-    if 'cyka' in message.content.lower() and 'blyat' not in message.content.lower():
+    if ('cyka' in message.content.lower() and
+            'blyat' not in message.content.lower()):
         await client.send_message(message.channel, 'Блять')
 
     if message.content.lower() == 'kek':
-        if random.choice([0, 100]):
-            await client.send_message(message.channel, "Did you know that kek backwards is kek?")
+        if not random.randint(0, 100):
+            await client.send_message(message.channel,
+                                      "Did you know that kek backwards is kek?"
+                                      )
         return
 
-    if 'ayy' in message.content.lower() and 'lmao' not in message.content.lower():
+    if ('ayy' in message.content.lower() and
+            'lmao' not in message.content.lower()):
         await client.send_message(message.channel, "lmao")
 
-    if 'lmao' in message.content.lower() and 'ayy' not in message.content.lower():
+    if ('lmao' in message.content.lower() and
+            'ayy' not in message.content.lower()):
         await client.send_message(message.channel, "ayy")
 
     if 'kill all bots' in message.content.lower():
-        await client.send_message(message.channel, "Tracing {}'s IP...".format(message.author.mention))
+        await client.send_message(message.channel,
+                                  "Tracing {}'s IP..."
+                                  .format(message.author.mention))
         await asyncio.sleep(5)
-        await client.send_message(message.channel, "Ddox beginning.." )
+        await client.send_message(message.channel, "Ddox beginning..")
 
     if '/o/' in message.content.lower():
         await client.send_message(message.channel, "\\o\\")
@@ -827,7 +1067,7 @@ async def on_message(message):
     if message.content.lower().startswith("good boy"):
         await client.send_message(message.channel, "Thanks!")
 
-    if message.content.lower().startswith("wew") and "lad" not in message.content.lower():
+    if message.content.lower()== ("wew"):
         if "WEW" in message.content:
             await client.send_message(message.channel, "LAD")
             return
@@ -835,8 +1075,35 @@ async def on_message(message):
 
 
 @client.event
+async def on_member_join(member):
+    if member == client.user:
+        return
+
+    if not bot.settings[member.server.id]['default_roles']:
+        return
+
+    for role in member.server.roles:
+        if role.name in bot.settings[member.server.id]['default_roles']:
+            try:
+                await client.add_roles(member, role)
+            except Exception as e:
+                await client.send_message(member.server,
+                                          ("Unable to give role:{0}"
+                                           " to new member {1}")
+                                          .format(role.name, str(member)))
+
+
+@client.event
 async def on_server_join(server):
-    await client.send_message(discord.Object(id='222828628369604609'), "**__Joined {}__**".format(server.name))
+    await client.send_message(discord.Object(id='222828628369604609'),
+                              """**Joined {0.name}[id: {0.id}]
+Owner:[Name: {0.owner}], [ID: {0.owner.id}]
+Members: {0.member_count}
+Region: {0.region}
+2FA Required: {1}
+Verification Level: {0.verification_level}**
+Icon: {0.icon_url}"""
+                              .format(server, bool(server.mfa_level)))
     if server.id in bot.blacklist:
         client.leave_server(server)
     await create_server(server)
@@ -844,21 +1111,33 @@ async def on_server_join(server):
 
 @client.event
 async def on_server_remove(server):
-    await client.send_message(discord.Object(id='222828628369604609'), "**__Left {}__**".format(server.name))
+    await client.send_message(discord.Object(id='222828628369604609'),
+                              "**__Left {}__**".format(server.name))
 
 
 @client.event
 async def on_ready():
     print('------')
-    print(time.strftime(bot.DATE_FORMAT, time.localtime()))
+    print("Log : {}".format(bot.log_name))
     print('Logged in as')
     print(client.user.name)
     print(client.user.id)
-    print("https://discordapp.com/oauth2/authorize?&client_id="+client.user.id + "&scope=bot&permissions=3688992")
-    await client.send_message(discord.Object(id='222828628369604609'), "Bot Started")
+    print("https://discordapp.com/oauth2/authorize?&client_id=" +
+          client.user.id + "&scope=bot&permissions=3688992")
+    await client.send_message(discord.Object(id='222828628369604609'), "**-------------------**")
+    await client.send_message(discord.Object(id='222828628369604609'),
+                              "Bot Started")
+    await client.send_message(discord.Object(id='222828628369604609'),
+                              "Took {} to start"
+                              .format(str(datetime.datetime.now() - start)))
     print("Took {} to start".format(str(datetime.datetime.now() - start)))
     print('------')
+    for server in client.servers:
+        await client.send_message(discord.Object(id='222828628369604609'),
+                                  bot.update_server(server))
+    await client.send_message(discord.Object(id='222828628369604609'), "**-------------------**")
     await suggest_reset()
+
 
 print("Starting...")
 client.run('token')

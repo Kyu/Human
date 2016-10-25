@@ -3,7 +3,10 @@
 #Server below is DiscordBots Server
 '110373943822540800':  # Server ID
   clear: 100  # Amount cleared by default on clear command
+  default_roles: []  # Roles given to new users
   disabled: []  #  Channels where the bot ignores everything
+  mod_log: ''  # Channel where the bot logs mod commands (not yet implemented)
+  disabled_commands: []  # Commands disabled in the server
   prefix: "'"   # Command prefix for this server
   silent:  # Channels where bot ignores un-prefixed triggers
   - '110373943822540800'
