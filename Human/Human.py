@@ -350,6 +350,7 @@ async def get_nation(url, arg):
 
 
 async def bloc_speaks(prompt=""):
+    # Mem leak here
     try:
         with open(os.getcwd() + '/BlocSim/BlocSpeaks.txt',
                   'r', encoding='utf-8') as f:
@@ -357,7 +358,7 @@ async def bloc_speaks(prompt=""):
     except FileNotFoundError:
         print("File not found")
         return
-    text_model = markovify.Text(text)  # *, state_size=4)
+    text_model = markovify.NewlineText(text)  # *, state_size=4)
     try:
         if prompt:
             sentence = text_model.make_sentence_with_start(prompt)
@@ -501,6 +502,9 @@ async def blacklist(obj):
 
 @client.event
 async def on_message(message):
+    if not message or not message.content:
+        return
+    
     if message.author.id in bot.blacklist:
         return
 
