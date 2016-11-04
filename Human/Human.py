@@ -60,6 +60,7 @@ class Bot:
                          'mention', 'mentioned', 'info', "invite", "kick",
                          "ban")
         self.suggest_timeout = {}
+        self.allow_convos = {}
         self.loadConvos()
         self.loadSettings()
         self.rss = {}  # *Unused
@@ -265,6 +266,24 @@ async def convo_manager(check):
         bot.convos[check] = Cleverbot()
         return bot.convos[check]
 
+async def bot_chat(channel, chatters=2):
+    prompt = "Hi"
+    prefixes = [":speech_balloon:", ":thought_balloon:", ":cloud_lightning:", ":diamond_shape_with_a_dot_inside:", ":thinking:", ":sunglasses:", ":poop:", ":eye_in_speech_bubble:", ":speech_left:", ":eyes:", ":robot:", ":no_mouth:", ":globe_with_meridians:", ":capital_abcd:", ":interrobang:"]
+    
+    if chatters > len(prefixes):
+        return "Too much bots. Max is {}".format(len(prefixes))
+    
+    while bot.allow_convos[channel.id]:
+        for i in range(1, chatters+1):
+            pr = "{0}Chatter: {1}".format(channel.id, i)
+            c = await convo_manager(pr)
+            prompt = c.ask(prompt)
+            await client.send_message(channel, "{0} {1}".format(prefixes[i], prompt))
+            await asyncio.sleep(3)
+        
+        await save_convos(bot.convos)
+    
+    return "Convo Done"        
 
 # *Log better
 async def take_log(message):
