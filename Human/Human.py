@@ -281,7 +281,7 @@ async def bot_chat(channel, chatters=2):
             await client.send_message(channel, "{0} {1}".format(prefixes[i], prompt))
             await asyncio.sleep(3)
         
-        await save_convos(bot.convos)
+        await save_convo(bot.convos)
     
     return "Convo Done"        
 
