@@ -2,15 +2,12 @@
 import asyncio
 import discord
 from cleverbot import Cleverbot
-from bs4 import BeautifulSoup
-import markovify
 import yaml
 from gingerit.gingerit import GingerIt
-#  import feedparser
 
 
 import time  # *Switch all time to datetime
-import datetime
+from datetime import datetime
 import aiohttp
 import pickle
 import random
@@ -18,7 +15,7 @@ import os
 import inspect
 import re
 
-start = datetime.datetime.now()
+start = datetime.now()
 
 
 class StartupErr(Exception):
@@ -40,7 +37,7 @@ class Bot:
         self.invite = "https://discordapp.com/oauth2/authorize?&client_id=210448501748924416&scope=bot&permissions=-1"
         self.version = 'Beta0.8'
         self.config_name = 'config.yml'
-        self.start = datetime.datetime.now()
+        self.start = datetime.now()
         self.commandsrun = 0
         self.lastsaid = {}
         self.defaultprefix = "."# *Find something better
@@ -53,12 +50,12 @@ class Bot:
         self.log_dir = os.getcwd() + "/logs/" + self.log_name
         self.commands = ('purge', 'blacklist', 'reload', 'say', 'roll', 'c',
                          'flip', 'play', 'clear', 'py', 'stop',
-                         'todo', 'bloc', 'suggestion', '8ball', 'stats',
+                         'todo', 'suggestion', '8ball', 'stats',
                          'whosaid', 'case', 'reverse', 'settings', 'setting',
-                         'country', 'eval', 'grammar', 'meow', 'doggo', 'dog',
+                         'eval', 'grammar', 'meow', 'doggo', 'dog',
                          'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
                          'mention', 'mentioned', 'info', "invite", "kick",
-                         "ban")
+                         "ban", "suggest")
         self.suggest_timeout = {}
         self.allow_convos = {}
         self.loadConvos()
@@ -89,7 +86,7 @@ class Bot:
         elif sess is None:
             sess = dict()
             sess['blacklist'] = []
-            with open(self.config_name, "w") as cfg:
+            with open(self.config_name, "w", encoding='utf-8') as cfg:
                 yaml.dump(sess, cfg, default_flow_style=False)
             self.settings = sess
         else:
@@ -101,11 +98,11 @@ class Bot:
     def update_server(self, server):
         settings = {"prefix": self.defaultprefix, "clear": 100, "silent": [],
                     "disabled": [], "default_roles": [],
-                    "disabled_commands": [], "mod_log": ""}
+                    "disabled_commands": [], "mod_log": "", "name": server.name}
 
         updated = []
 
-        for i in self.setting_format:
+        for i in settings:
             if i not in self.settings[server.id]:
                 self.settings[server.id][i] = settings[i]
                 updated.append(i)
@@ -118,7 +115,7 @@ class Bot:
             return "Nothing to update in {0.name}".format(server)
 
     def reload_settings(self):
-        with open(self.config_name, "w") as cfg:
+        with open(self.config_name, "w", encoding='utf-8') as cfg:
             yaml.dump(self.settings, cfg, default_flow_style=False)
 
     def info(self):
@@ -165,7 +162,6 @@ Roll a die: {0}roll `<optional number of sides>`
 Flip a coin: {0}flip
 Radio: {0}play `URL`
 Magic 8-ball:{0}8ball `query`
-BlocSimulator: {0}bloc
 Stats: {0}stats
 Bot info: {0}info
 New Quote: {0}case `thing`
@@ -269,10 +265,10 @@ async def convo_manager(check):
 async def bot_chat(channel, chatters=2):
     prompt = "Hi"
     prefixes = [":speech_balloon:", ":thought_balloon:", ":cloud_lightning:", ":diamond_shape_with_a_dot_inside:", ":thinking:", ":sunglasses:", ":poop:", ":eye_in_speech_bubble:", ":speech_left:", ":eyes:", ":robot:", ":no_mouth:", ":globe_with_meridians:", ":capital_abcd:", ":interrobang:"]
-    
+
     if chatters > len(prefixes):
         return "Too much bots. Max is {}".format(len(prefixes))
-    
+
     while bot.allow_convos[channel.id]:
         for i in range(1, chatters+1):
             pr = "{0}Chatter: {1}".format(channel.id, i)
@@ -280,10 +276,10 @@ async def bot_chat(channel, chatters=2):
             prompt = c.ask(prompt)
             await client.send_message(channel, "{0} {1}".format(prefixes[i], prompt))
             await asyncio.sleep(3)
-        
+
         await save_convo(bot.convos)
-    
-    return "Convo Done"        
+
+    return "Convo Done"
 
 # *Log better
 async def take_log(message):
@@ -324,73 +320,8 @@ async def take_log(message):
                       file=text_file)
 
 
-async def get_nation(url, arg):
-    '''if url == "args":
-        return `info, land, qol, econ, rep, army`
-    '''
-    NATION_ARGS = {"info": 0, "land": 1, "qol": 2, "econ": 3, "rep": 4,
-                   "army": 5}
-
-    if arg == "" or arg not in NATION_ARGS:
-        return ("**Specify with one of the following arguments:"
-                " <info, land, qol, econ, rep, army>**")
-    try:
-        async with aiohttp.get(url) as req:
-            if req.status == 200:
-                open_country = await req.text()
-        soup = BeautifulSoup(open_country, "html.parser")
-        table = soup.find_all("table", attrs={"class": """table table-striped
-                                              table-condensed table-hover
-                                              table-bordered"""})
-    except Exception as e:
-        return ":x:{}:x:".format(str(e))
-
-    war_check = ""
-    war_country = ""
-    super_clean_table = ""
-    if arg != "":
-        for t in table[NATION_ARGS[arg]]:
-            clean_table = BeautifulSoup(str(t), "html.parser")
-            war_check += clean_table.prettify()
-            super_clean_table += clean_table.get_text()
-    else:
-        return "Something went wrong :("
-
-    if arg == "army" and "at peace" not in super_clean_table.lower():
-        new_soup = BeautifulSoup(war_check, "html.parser")
-        for link in new_soup.findAll('a'):
-            if "#" not in link.get('href'):
-                war_country += link.get('href')
-
-        return (super_clean_table.replace("\n\n", "\n") +
-                "\n" + "http://www.blocgame.com" + war_country)
-
-    return super_clean_table.replace("\n\n", "\n")
-
-
-async def bloc_speaks(prompt=""):
-    # Mem leak here
-    try:
-        with open(os.getcwd() + '/BlocSim/BlocSpeaks.txt',
-                  'r', encoding='utf-8') as f:
-            text = f.read()
-    except FileNotFoundError:
-        print("File not found")
-        return
-    text_model = markovify.NewlineText(text)  # *, state_size=4)
-    try:
-        if prompt:
-            sentence = text_model.make_sentence_with_start(prompt)
-            return sentence
-        else:
-            sentence = text_model.make_sentence()
-            return sentence
-    except Exception as e:
-        return (e)
-
-
 async def stats():
-    uptime = str(datetime.datetime.now() - bot.start).split(".")[0]
+    uptime = str(datetime.now() - bot.start).split(".")[0]
     servers = len(client.servers)
     return '''Uptime: {0}
 Commands Run: {1}
@@ -471,7 +402,7 @@ async def set(server, case, rule):
         case = 'create'
         return """Server rules have just been created. Do {}settings to view them
         """.format(bot.defaultprefix)
-    with open(bot.config_name, "w") as cfg:
+    with open(bot.config_name, "w", encoding='utf-8') as cfg:
         yaml.dump(config, cfg, default_flow_style=False)
         bot.loadSettings()
 
@@ -487,6 +418,7 @@ async def set(server, case, rule):
 async def create_server(server):
     cfg_name = 'config.yml'
     default_cfg = {server.id: bot.setting_format}
+    # default_cfg[server.id]['name'] = server.name
 
     with open(cfg_name, 'r') as f:
         config = yaml.load(f)
@@ -495,7 +427,7 @@ async def create_server(server):
         if server.id in list(config):
             return
 
-        with open(cfg_name, "a") as cfg:
+        with open(cfg_name, "a", encoding='utf-8') as cfg:
             yaml.dump(default_cfg, cfg, default_flow_style=False)
             bot.loadSettings()
             return
@@ -513,7 +445,7 @@ async def blacklist(obj):
     else:
         list_doc['blacklist'].remove(obj)
 
-    with open("config.yml", "w") as f:
+    with open("config.yml", "w", encoding='utf-8') as f:
         yaml.dump(list_doc, f, default_flow_style=False)
 
     bot.loadSettings()
@@ -523,9 +455,13 @@ async def blacklist(obj):
 async def on_message(message):
     if not message or not message.content:
         return
-    
+    if message.server.id != '142510428591882241':
+        return
     if message.author.id in bot.blacklist:
         return
+
+    if message.server.id not in bot.settings:
+        await create_server(message.server)
 
     prefix = bot.defaultprefix
 
@@ -541,20 +477,6 @@ async def on_message(message):
 
     if message.author == client.user:
         await take_log(message)
-
-        if (message.content.count('\n') >= 10 and
-                not message.channel.is_private):
-            temp_msg = message
-            warn_msg = await client.send_message(message.channel,
-                                                 ("^ That message will be "
-                                                  "deleted in 30s for "
-                                                  "being too long. This an "
-                                                  "an experimental feature as "
-                                                  "not to clog chat "))
-            await asyncio.sleep(5)
-            await client.delete_message(warn_msg)
-            await asyncio.sleep(25)
-            await client.delete_message(temp_msg)
         return
 
     if message.author.bot:
@@ -655,17 +577,6 @@ async def on_message(message):
                                       (":x: Oops something went wrong! "
                                        "Is the bot server down?"))
 
-    if message.content.lower().split()[0] == prefix + 'bloc':
-        if args:
-            if len(args) > 2:
-                await client.send_message(message.channel,
-                                          ":x:Prompt can only be 1 or 2 words long:x:")
-                return
-            prompt = await args.toString()
-            await client.send_message(message.channel,
-                                      await bloc_speaks(prompt=prompt))
-            return
-        await client.send_message(message.channel, await bloc_speaks())
     # *Useful
     if message.content.lower().split()[0] == prefix + 'help':
         msg = await client.send_message(message.channel,
@@ -693,9 +604,8 @@ async def on_message(message):
 
     if message.content.lower().split()[0] == prefix + "suggestion":
         if not args:
-            await client.send_message(message.channel,
-                                      ("Do nothing is a great suggestion. "
-                                       "I'll do that all day"))
+            await client.send_message(message.channel, ("Do nothing is a great suggestion. "
+                                                        "I'll do that all day"))
             return
 
         try:
@@ -705,13 +615,12 @@ async def on_message(message):
                                           .format(message.author.mention))
                 return
         except KeyError:
-            bot.suggest_timeout[message.author.id] = 1
+            bot.suggest_timeout[message.author.id] = 0
 
         bot.suggest_timeout[message.author.id] += 1
-        with open("todo.txt", "a") as todofile:
-            print("[Suggestion from]{0}: {1}"
-                  .format(message.author.name, await args.toString()),
-                  file=todofile)
+
+        await client.send_message(discord.Object(id='240528124297740298'), "***Suggestion from {0.author} in {0.server.name}:{0.channel.name}*** \n```{1}```"
+                                                                           .format(message, await args.toString()))
 
     if (message.content.lower().split()[0] == prefix + 'cat' or
             message.content.lower().split()[0] == prefix + 'meow' or
@@ -731,39 +640,6 @@ async def on_message(message):
             await client.send_message(message.channel, "Word?")
             return
         # *parse json from http://api.urbandictionary.com/v0/define?term= + " ".join(message.content.split()[1:])
-
-    if message.content.lower().split()[0] == prefix + "country":
-        if args:
-            m = args[0]
-            try:
-                args[1]
-            except IndexError:
-                await client.send_message(message.channel,
-                                          "Specify with an argument `<info, land, qol, econ, rep, army>`")
-                return
-        else:
-            await client.send_message(message.channel,
-                                      "I need a country url here")
-            return
-
-        try:
-            if m.isdigit():
-                fullm = "http://blocgame.com/stats.php?id=" + m
-                info = await get_nation(fullm, args[1])
-                await client.send_message(message.channel,
-                                          "Getting info from http://blocgame.com/stats.php?id=" +
-                                          m + "\n" + info)
-            elif "blocgame.com/stats.php?id=" in m:
-                info = await get_nation(m, args[1])
-                await client.send_message(message.channel,
-                                          "Getting info from " +
-                                          m + "\n" + info)
-            else:
-                await client.send_message(message.channel,
-                                          "Bad nation link/number")
-        except IndexError:
-            await client.send_message(message.channel,
-                                      "That nation does not exist")
 
     if message.content.lower().split()[0] == prefix + "play":
         await client.send_message(message.channel,
@@ -1114,10 +990,14 @@ async def on_member_join(member):
                                           ("Unable to give role:{0}"
                                            " to new member {1}")
                                           .format(role.name, str(member)))
+    if member.server.id == "246969937271324672":
+        await bot.change_nickname(member, "Comrade {0.name}".format(member))
 
 
 @client.event
 async def on_server_join(server):
+    await create_server(server)
+
     await client.send_message(discord.Object(id='222828628369604609'),
                               """**Joined {0.name}[id: {0.id}]
 Owner:[Name: {0.owner}], [ID: {0.owner.id}]
@@ -1125,11 +1005,15 @@ Members: {0.member_count}
 Region: {0.region}
 2FA Required: {1}
 Verification Level: {0.verification_level}**
-Icon: {0.icon_url}"""
-                              .format(server, bool(server.mfa_level)))
+Icon: {0.icon_url}""".format(server, bool(server.mfa_level)))
+
     if server.id in bot.blacklist:
         client.leave_server(server)
-    await create_server(server)
+    # .format(bot.settings[server.id]['prefix'])
+    await client.send_message(server, ("Thanks for inviting me to your server! Mention me or use .help for help.\n"
+                                       "You can also change the server's prefix using .setting prefix {newprefix}"
+                                       "You can also join https://discord.gg/2MqkeeJ for updates and to talk with the creator.\n"
+                                       "Make sure to use .suggestion to give feedback on your experience with the bot!"))
 
 
 @client.event
@@ -1147,20 +1031,34 @@ async def on_ready():
     print(client.user.id)
     print("https://discordapp.com/oauth2/authorize?&client_id=" +
           client.user.id + "&scope=bot&permissions=3688992")
-    await client.send_message(discord.Object(id='222828628369604609'), "**-------------------**")
-    await client.send_message(discord.Object(id='222828628369604609'),
-                              "Bot Started")
+    await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
+    await client.send_message(discord.Object(id='222828628369604609'), "Bot Started")
     await client.send_message(discord.Object(id='222828628369604609'),
                               "Took {} to start"
-                              .format(str(datetime.datetime.now() - start)))
-    print("Took {} to start".format(str(datetime.datetime.now() - start)))
+                              .format(str(datetime.now() - start)))
+    print("Took {} to start".format(str(datetime.now() - start)))
     print('------')
+    updates = []
+    updated = 0
     for server in client.servers:
-        await client.send_message(discord.Object(id='222828628369604609'),
-                                  bot.update_server(server))
-    await client.send_message(discord.Object(id='222828628369604609'), "**-------------------**")
+        await create_server(server)
+    for server in client.servers:
+        updates.append(bot.update_server(server))
+    for update in updates:
+        if not update.startswith("Nothing to update"):
+            await client.send_message(discord.Object(id='222828628369604609'), update)
+            updated += 1
+    if not updates:
+        await client.send_message(discord.Object(id='222828628369604609'), "All servers have up to date configs")
+    else:
+        await client.send_message(discord.Object(id='222828628369604609'), "Updated {} configs".format(updated))
+    await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
     await suggest_reset()
 
+# Brain MjIzNTU5OTI5MzMwNTMyMzUy.CrNwqg.gIzuv8YyEPM6n40fcsuJ46lYFp8
+# Human MjEwNDQ4NTAxNzQ4OTI0NDE2.CoPMWw.ZP0hEVBumRP5hvqAzQSRYkOuEmU
+# sudo pm2 start Human.py --interpreter python3.5 --interpreter-args "-u"
+# --name HumanBot
 
 print("Starting...")
-client.run('token')
+client.run('MjEwNDQ4NTAxNzQ4OTI0NDE2.CoPMWw.ZP0hEVBumRP5hvqAzQSRYkOuEmU')
