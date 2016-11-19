@@ -996,6 +996,9 @@ async def on_member_join(member):
 
 @client.event
 async def on_server_join(server):
+    if server.id in bot.blacklist:
+        client.leave_server(server)
+
     await create_server(server)
 
     await client.send_message(discord.Object(id='222828628369604609'),
@@ -1007,8 +1010,6 @@ Region: {0.region}
 Verification Level: {0.verification_level}**
 Icon: {0.icon_url}""".format(server, bool(server.mfa_level)))
 
-    if server.id in bot.blacklist:
-        client.leave_server(server)
     # .format(bot.settings[server.id]['prefix'])
     await client.send_message(server, ("Thanks for inviting me to your server! Mention me or use .help for help.\n"
                                        "You can also change the server's prefix using .setting prefix {newprefix}"
@@ -1055,10 +1056,6 @@ async def on_ready():
     await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
     await suggest_reset()
 
-# Brain MjIzNTU5OTI5MzMwNTMyMzUy.CrNwqg.gIzuv8YyEPM6n40fcsuJ46lYFp8
-# Human MjEwNDQ4NTAxNzQ4OTI0NDE2.CoPMWw.ZP0hEVBumRP5hvqAzQSRYkOuEmU
-# sudo pm2 start Human.py --interpreter python3.5 --interpreter-args "-u"
-# --name HumanBot
 
 print("Starting...")
-client.run('MjEwNDQ4NTAxNzQ4OTI0NDE2.CoPMWw.ZP0hEVBumRP5hvqAzQSRYkOuEmU')
+client.run('token')
