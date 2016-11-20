@@ -455,8 +455,6 @@ async def blacklist(obj):
 async def on_message(message):
     if not message or not message.content:
         return
-    if message.server.id != '142510428591882241':
-        return
     if message.author.id in bot.blacklist:
         return
 
@@ -585,8 +583,6 @@ async def on_message(message):
         await client.send_message(message.author,
                                   bot.helpText()
                                   .format(prefix, message.server))
-        await asyncio.sleep(15)
-        await client.delete_message(msg)
 
     if message.content.lower().split()[0] == prefix + "invite":
         await client.send_message(message.channel, bot.invite)
