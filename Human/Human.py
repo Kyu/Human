@@ -5,7 +5,6 @@ from cleverbot import Cleverbot
 import yaml
 from gingerit.gingerit import GingerIt
 
-
 import time  # *Switch all time to datetime
 from datetime import datetime
 import aiohttp
@@ -382,8 +381,7 @@ async def set(server, case, rule):
                     action = 'added to'
             else:
                 return "Invalid rule {}".format(rule)
-        if (case == 'silent' or case == 'disabled'
-                or case == 'default_roles' or case == 'disabled_commands'):
+        if (case == 'default_roles' or case == 'disabled_commands'):
             if type(rule) is str:
                 try:
                     if rule in config[server.id][case]:
@@ -458,9 +456,6 @@ async def on_message(message):
     if message.author.id in bot.blacklist:
         return
 
-    if message.server.id not in bot.settings:
-        await create_server(message.server)
-
     prefix = bot.defaultprefix
 
     if not message.channel.is_private:
@@ -490,11 +485,13 @@ async def on_message(message):
             await take_log(message)
 
     # *Triggers
-    if message.content == client.user.mention:
-        print(message.author.name + " mentioned you!")
+    if (message.content == client.user.mention or
+            message.content == (client.user.mention + " help") or
+            message.content.lower().split()[0] == prefix + 'help'):
         await client.send_message(message.author,
-                                  bot.helpText().format(prefix, message.server)
-                                  )
+                                  bot.helpText().format(prefix, message.server))
+        await client.send_message(message.channel,
+                                        """Help Sent to {}!""".format(message.author.mention))
 
     if client.user.mention in message.content:
         await take_log(message)
@@ -576,14 +573,6 @@ async def on_message(message):
                                        "Is the bot server down?"))
 
     # *Useful
-    if message.content.lower().split()[0] == prefix + 'help':
-        msg = await client.send_message(message.channel,
-                                        """Help Sent to {}!"""
-                                        .format(message.author.mention))
-        await client.send_message(message.author,
-                                  bot.helpText()
-                                  .format(prefix, message.server))
-
     if message.content.lower().split()[0] == prefix + "invite":
         await client.send_message(message.channel, bot.invite)
 
@@ -784,10 +773,18 @@ async def on_message(message):
                                           "Use {}setting info to see what you can set"
                                           .format(prefix))
                 return
+            _set = await Args(args[1:]).toString()
+
+            print(_set)
             try:
-                await client.send_message(message.channel, await set(message.server, args[0], await Args(args[1:]).toString()))
-            except IndexError:
-                await client.send_message(message.channel, await set(message.server, args[0], message.channel))
+                if _set:
+                    await client.send_message(message.channel, await set(message.server, args[0], await Args(args[1:]).toString()))
+                else:
+                    await client.send_message(message.channel, await set(message.server, args[0], message.channel))
+            except Exception as e:
+                print("Setting error reeeeeeeee:")
+                print(type(e).__name__ +': ' + str(e))
+
 
     if (message.channel.permissions_for(message.author).manage_server or
             message.author.id == '142510125255491584'):
@@ -843,8 +840,7 @@ async def on_message(message):
                                                 "{0} has Deleted {1} messages!"
                                                 .format(message.author.mention,
                                                         deleted))
-                await asyncio.sleep(15)
-                await client.delete_message(msg)
+
 
     # *Owner
     if message.author.id == '142510125255491584':
@@ -1013,6 +1009,7 @@ Icon: {0.icon_url}""".format(server, bool(server.mfa_level)))
                                        "Make sure to use .suggestion to give feedback on your experience with the bot!"))
 
 
+
 @client.event
 async def on_server_remove(server):
     await client.send_message(discord.Object(id='222828628369604609'),
@@ -1051,7 +1048,6 @@ async def on_ready():
         await client.send_message(discord.Object(id='222828628369604609'), "Updated {} configs".format(updated))
     await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
     await suggest_reset()
-
 
 print("Starting...")
 client.run('token')
