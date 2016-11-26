@@ -175,7 +175,7 @@ See past mentions: {0}mentions [number]
 Grammar checker: {0}grammar <thing> |{0}g
 Invite link: {0}invite
 Wikipedia article: {0}wiki <query> [max sentences] | {0}wikipedia
-
+xkcd comic: {0}xkcd [number, random]
 
 __**Level 0: Server Mods**__
 Clear chat: {0}clear [optional number, default is 100] [@ user]
