@@ -1,0 +1,4 @@
+discord # https://github.com/Rapptz/discord.py
+cleverbot # https://github.com/folz/cleverbot.py
+yaml # https://pyyaml.org/
+gingerIt # https://github.com/Azd325/gingerit
