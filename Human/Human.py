@@ -12,7 +12,6 @@ import aiohttp
 import pickle
 import random
 import os
-import sys
 import inspect
 import re
 
