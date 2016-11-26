@@ -4,6 +4,7 @@ import discord
 from cleverbot import Cleverbot
 import yaml
 from gingerit.gingerit import GingerIt
+import Fun
 
 import time  # *Switch all time to datetime
 from datetime import datetime
@@ -11,6 +12,7 @@ import aiohttp
 import pickle
 import random
 import os
+import sys
 import inspect
 import re
 
@@ -54,7 +56,7 @@ class Bot:
                          'eval', 'grammar', 'meow', 'doggo', 'dog',
                          'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
                          'mention', 'mentioned', 'info', "invite", "kick",
-                         "ban", "suggest")
+                         "ban", "suggest", "wiki", "wikipedia")
         self.suggest_timeout = {}
         self.allow_convos = {}
         self.loadConvos()
@@ -152,33 +154,37 @@ Server: https://discord.gg/2MqkeeJ
 Here are your commands!
 The prefix for this Server: {1.name} is `{0}`
 
+Key:
+<>: Required argument
+[]: Optional argument
+||: Alias to a command
+
 __**Level 0: Normal users**__
-Repeat after me: {0}say `thing`
-See who last used {0}say: `{0}whosaid`
-Chatbot: {0}c `message`
-Country info: {0}country <args>`[info, land, QOL, econ, loc, army]`
-Roll a die: {0}roll `<optional number of sides>`
+Repeat after me: {0}say <thing>
+See who last used {0}say: {0}whosaid
+Chatbot: {0}c <message>
+Roll a die: {0}roll [number of sides]
 Flip a coin: {0}flip
-Radio: {0}play `URL`
-Magic 8-ball:{0}8ball `query`
+Radio: {0}play <URL>
+Magic 8-ball:{0}8ball [query]
 Stats: {0}stats
 Bot info: {0}info
-New Quote: {0}case `thing`
-Reverse a sentence: {0}reverse `sentence`
-View a quote: {0}case `thing` |also comes with [tell me about] `thing`|
-See past mentions: {0}mentions `optional number`
-Grammar checker: {0}grammar `thing` | Aliases : {0}g
+New Quote: {0}case <thing> <quote>
+View a quote:tell me about <thing>
+Reverse a sentence: {0}reverse <thing>
+See past mentions: {0}mentions [number]
+Grammar checker: {0}grammar <thing> |{0}g
 Invite link: {0}invite
-
+Wikipedia article: {0}wiki <query> [max sentences] | {0}wikipedia
 
 
 __**Level 0: Server Mods**__
-Clear chat: {0}clear `<optional number, default is 100>` `optional User/id`
-View Settings: {0}settings `optional arg[clear, silent, disabled, prefix]`
-Change a setting: {0}setting `setting name` `value` | Do {0}setting `info` to view what you settings can change
-Send a suggestion: {0}suggestion `suggestion`
-Kick a user: {0}kick `@User/userid` optional reason
-Ban a user: {0}kick `@User/userid` optional reason  | optional purge=n
+Clear chat: {0}clear [optional number, default is 100] [@ user]
+View Settings: {0}settings [clear, silent, disabled, prefix]
+Change a setting: {0}setting <setting name> <value> | Do `{0}setting info` to view what you settings can change
+Send a suggestion: {0}suggestion <suggestion>
+Kick a user: {0}kick <@User/userid> [reason]
+Ban a user: {0}kick <@User/userid> [reason] [purge=n]
 
 Bot Discord:
 https://discord.gg/2MqkeeJ
@@ -470,7 +476,6 @@ async def on_message(message):
 
     if message.author == client.user:
         await take_log(message)
-        return
 
     if message.author.bot:
         return
@@ -625,6 +630,20 @@ async def on_message(message):
             await client.send_message(message.channel, "Word?")
             return
         # *parse json from http://api.urbandictionary.com/v0/define?term= + " ".join(message.content.split()[1:])
+
+    if (message.content.lower().split()[0] == prefix + "wiki" or
+            message.content.lower().split()[0] == prefix + "wikipedia"):
+        if not args:
+            await client.send_message(message.channel, "Query must not be empty!")
+            return
+
+        sentences = 3
+
+        if args[-1].isdigit():
+            sentences = int(args[-1]) if int(args[-1]) > 0 and int(args[-1]) < 11 else 3
+        if len(args) < 2:
+            args.append(args[0])
+        await client.send_message(message.channel, await Fun.wiki(await Args(args[:-1]).toString(), sentences=sentences))
 
     if message.content.lower().split()[0] == prefix + "play":
         await client.send_message(message.channel,
@@ -1009,12 +1028,10 @@ Icon: {0.icon_url}""".format(server, bool(server.mfa_level)))
                                        "Make sure to use .suggestion to give feedback on your experience with the bot!"))
 
 
-
 @client.event
 async def on_server_remove(server):
     await client.send_message(discord.Object(id='222828628369604609'),
                               "**__Left {}__**".format(server.name))
-
 
 @client.event
 async def on_ready():
@@ -1049,5 +1066,6 @@ async def on_ready():
     await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
     await suggest_reset()
 
-print("Starting...")
-client.run('token')
+if __name__ == "__main__":
+    print("Starting...")
+    client.run('token')
