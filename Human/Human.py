@@ -55,7 +55,7 @@ class Bot:
                          'eval', 'grammar', 'meow', 'doggo', 'dog',
                          'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
                          'mention', 'mentioned', 'info', "invite", "kick",
-                         "ban", "suggest", "wiki", "wikipedia")
+                         "ban", "suggest", "wiki", "wikipedia", "xkcd")
         self.suggest_timeout = {}
         self.allow_convos = {}
         self.loadConvos()
@@ -587,7 +587,7 @@ async def on_message(message):
         pong = await client.send_message(message.channel, "Ow!")
         ping = pong.timestamp - message.timestamp
         await client.edit_message(pong,
-                                  "Response took 0{}s"
+                                  "Response took {}s"
                                   .format((str(ping).split(':')[2])
                                           .strip('0')))
 
@@ -644,6 +644,20 @@ async def on_message(message):
             args.append(args[0])
         await client.send_message(message.channel, await Fun.wiki(await Args(args[:-1]).toString(), sentences=sentences))
 
+    if message.content.lower().split()[0] == prefix + "xkcd":
+        # Do explain later, too lazy rn
+        if not args:
+            comic = await Fun.get_xkcd()
+        elif args[0] == "random":
+            comic = await Fun.get_xkcd(random=True)
+        elif args[0].isdigit():
+            comic = await Fun.get_xkcd(number=int(args[0]))
+        else:
+            comic = await Fun.get_xkcd()
+
+        await client.send_message(message.channel, comic[0])
+        await client.send_message(message.channel, comic[1])
+        return
     if message.content.lower().split()[0] == prefix + "play":
         await client.send_message(message.channel,
                                   ":x:Disabled due to bandwith issues")
