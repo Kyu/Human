@@ -12,6 +12,7 @@ import aiohttp
 import pickle
 import random
 import os
+import subprocess
 import inspect
 import re
 
@@ -176,6 +177,7 @@ Grammar checker: {0}grammar <thing> |{0}g
 Invite link: {0}invite
 Wikipedia article: {0}wiki <query> [max sentences] | {0}wikipedia
 xkcd comic: {0}xkcd [number, random]
+
 
 __**Level 0: Server Mods**__
 Clear chat: {0}clear [optional number, default is 100] [@ user]
@@ -607,9 +609,14 @@ async def on_message(message):
             bot.suggest_timeout[message.author.id] = 0
 
         bot.suggest_timeout[message.author.id] += 1
-
-        await client.send_message(discord.Object(id='240528124297740298'), "***Suggestion from {0.author} in {0.server.name}:{0.channel.name}*** \n```{1}```"
-                                                                           .format(message, await args.toString()))
+        embed = discord.Embed(description="")
+        embed.color = discord.Colour.blue()
+        embed.set_author(name=message.author, icon_url=message.author.avatar_url)
+        embed.add_field(name=message.server.name, value=message.server.id)
+        embed.add_field(name=message.channel.name, value=message.channel.id)
+        embed.timestamp = message.timestamp
+        embed.add_field(name="Suggestion", value=await args.toString() + "\n", inline=False)
+        await client.send_message(discord.Object(id='240528124297740298'), embed=embed)
 
     if (message.content.lower().split()[0] == prefix + 'cat' or
             message.content.lower().split()[0] == prefix + 'meow' or
@@ -807,7 +814,6 @@ async def on_message(message):
                 return
             _set = await Args(args[1:]).toString()
 
-            print(_set)
             try:
                 if _set:
                     await client.send_message(message.channel, await set(message.server, args[0], await Args(args[1:]).toString()))
@@ -911,8 +917,10 @@ async def on_message(message):
                                           python.format(type(e).__name__ +
                                                         ': ' + str(e)))
                 return
-
-            await client.send_message(message.channel, python.format(result))
+            result = str(result)
+            end = [result[i:i+1900] for i in range(0, len(result), 1900)]
+            for i in end:
+                await client.send_message(message.channel, python.format(i))
 
         if message.content.lower().split()[0] == prefix + "py":
             python = '```py\n{}\n```'
@@ -926,7 +934,27 @@ async def on_message(message):
                                           python.format(type(e).__name__ +
                                                         ': ' + str(e)))
                 return
-            await client.send_message(message.channel, python.format(result))
+            result = str(result)
+            end = [result[i:i+1900] for i in range(0, len(result), 1900)]
+            for i in end:
+                await client.send_message(message.channel, python.format(i))
+
+        if message.content.lower().split()[0] == prefix + "shell":
+            python = '```py\n{}\n```'
+            cmd = bytes(message.content.replace(prefix+'py', "", 1), "utf-8").decode("unicode_escape").strip()
+            try:
+                result = subprocess.getoutput(cmd)
+            except Exception as e:
+                await client.send_message(message.channel,
+                                          python.format(type(e).__name__ +
+                                                        ': ' + str(e)))
+                return
+
+            result = str(result)
+            end = [result[i:i+1900] for i in range(0, len(result), 1900)]
+            for i in end:
+                await client.send_message(message.channel, python.format(i))
+
 
         if message.content.lower().split()[0] == prefix + "stop":
             await client.send_message(message.channel, "Hammer Time!")
