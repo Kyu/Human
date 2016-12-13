@@ -5,6 +5,7 @@ from cleverbot import Cleverbot
 import yaml
 from gingerit.gingerit import GingerIt
 import Fun
+from Utils import *
 
 import time  # *Switch all time to datetime
 from datetime import datetime
@@ -19,18 +20,10 @@ import re
 start = datetime.now()
 
 
-class StartupErr(Exception):
-    pass
-
-
-class Args(list):
-    async def toString(self):
-        return " ".join(self)
-
-
 class Bot:
     def __init__(self):
         self.bootup = self.boot()
+        self.started = False
         self.name = "Human"
         self.author = '@Yu#9162'
         self.library = 'discord.py'
@@ -41,7 +34,7 @@ class Bot:
         self.start = datetime.now()
         self.commandsrun = 0
         self.lastsaid = {}
-        self.defaultprefix = "."# *Find something better
+        self.defaultprefix = "."  # *Find something better
         self.setting_format = {"prefix": ".", "clear": 100, "silent": [],
                                "disabled": [], "default_roles": [],
                                "disabled_commands": [], "mod_log": ""}
@@ -56,7 +49,7 @@ class Bot:
                          'eval', 'grammar', 'meow', 'doggo', 'dog',
                          'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
                          'mention', 'mentioned', 'info', "invite", "kick",
-                         "ban", "suggest", "wiki", "wikipedia", "xkcd")
+                         "ban", "suggest", "wiki", "wikipedia", "xkcd", "shell")
         self.suggest_timeout = {}
         self.allow_convos = {}
         self.loadConvos()
@@ -219,31 +212,6 @@ async def correctGrammar(text):
     return correctedgrammar
 
 
-async def fortune():
-    poss = ["It is certain",
-            "It is decidedly so",
-            "Without a doubt",
-            "Yes, definitely",
-            "You may rely on it",
-            "As I see it, yes",
-            "Most likely",
-            "Outlook good",
-            "Yes",
-            "Signs point to yes",
-            "Reply hazy try again",
-            "Ask again later",
-            "Better not tell you now",
-            "Cannot predict now",
-            "Concentrate and ask again",
-            "Don't count on it",
-            "My reply is no",
-            "My sources say no",
-            "Outlook not so good",
-            "Very doubtful"]
-
-    return poss[random.randint(0, 19)]
-
-
 async def getDoggo():
     doggo = 'random.dog/ doggo'
     return doggo
@@ -260,14 +228,6 @@ async def save_convo(obj):
     return
 
 
-async def convo_manager(check):
-    if check in bot.convos:
-        return bot.convos[check]
-    else:
-        # *Creates a conversation for them if not
-        bot.convos[check] = Cleverbot()
-        return bot.convos[check]
-
 async def bot_chat(channel, chatters=2):
     prompt = "Hi"
     prefixes = [":speech_balloon:", ":thought_balloon:", ":cloud_lightning:", ":diamond_shape_with_a_dot_inside:", ":thinking:", ":sunglasses:", ":poop:", ":eye_in_speech_bubble:", ":speech_left:", ":eyes:", ":robot:", ":no_mouth:", ":globe_with_meridians:", ":capital_abcd:", ":interrobang:"]
@@ -278,7 +238,7 @@ async def bot_chat(channel, chatters=2):
     while bot.allow_convos[channel.id]:
         for i in range(1, chatters+1):
             pr = "{0}Chatter: {1}".format(channel.id, i)
-            c = await convo_manager(pr)
+            c = await Fun.convo_manager(pr)
             prompt = c.ask(prompt)
             await client.send_message(channel, "{0} {1}".format(prefixes[i], prompt))
             await asyncio.sleep(3)
@@ -287,9 +247,10 @@ async def bot_chat(channel, chatters=2):
 
     return "Convo Done"
 
+
 # *Log better
 async def take_log(message):
-    logdir = os.getcwd() + "/logs/"
+    # logdir = os.getcwd() + "/logs/"
 
     try:
         if message.channel.is_private:
@@ -468,8 +429,6 @@ async def on_message(message):
     if not message.channel.is_private:
         if message.server.id in bot.blacklist:
             return
-        if message.channel.id in bot.settings[message.server.id]['disabled']:
-            return
         if message.server.id not in bot.settings:
             await create_server(message.server)
 
@@ -484,6 +443,8 @@ async def on_message(message):
     for i in bot.commands:
         if message.content.lower().split()[0] == prefix + i:
             if i in bot.settings[message.server.id]["disabled_commands"]:
+                return
+            if (message.channel.id in bot.settings[message.server.id]['disabled']) and (not i.startswith('set')):
                 return
             args = (Args(message.content.split()[1:])
                     if message.content.split()[1:] else None)
@@ -507,7 +468,7 @@ async def on_message(message):
             await client.send_message(message.channel,
                                       "Actually there are only 7 dragon balls")
             return
-        await client.send_message(message.channel, await fortune())
+        await client.send_message(message.channel, await Fun.fortune())
 
     if message.content.lower().split()[0] == prefix + 'say':
         if args is None:
@@ -566,7 +527,7 @@ async def on_message(message):
     if message.content.lower().split()[0] == prefix + 'c':
         await client.send_typing(message.channel)
         try:
-            c = await convo_manager(message.author)
+            c = await Fun.convo_manager(message.author)
             await client.send_message(message.channel,
                                       c.ask(await args.toString()))
             await save_convo(bot.convos)
@@ -593,7 +554,7 @@ async def on_message(message):
                                   .format((str(ping).split(':')[2])
                                           .strip('0')))
 
-    if message.content.lower().split()[0] == prefix + "suggestion":
+    if message.content.lower().split()[0] == prefix + "suggestion" or message.content.lower().split()[0] == prefix + "suggest":
         if not args:
             await client.send_message(message.channel, ("Do nothing is a great suggestion. "
                                                         "I'll do that all day"))
@@ -821,8 +782,7 @@ async def on_message(message):
                     await client.send_message(message.channel, await set(message.server, args[0], message.channel))
             except Exception as e:
                 print("Setting error reeeeeeeee:")
-                print(type(e).__name__ +': ' + str(e))
-
+                print(type(e).__name__ + ': ' + str(e))
 
     if (message.channel.permissions_for(message.author).manage_server or
             message.author.id == '142510125255491584'):
@@ -878,8 +838,6 @@ async def on_message(message):
                                                 "{0} has Deleted {1} messages!"
                                                 .format(message.author.mention,
                                                         deleted))
-
-
     # *Owner
     if message.author.id == '142510125255491584':
         if message.content.lower().split()[0] == prefix + 'blacklist':
@@ -941,7 +899,7 @@ async def on_message(message):
 
         if message.content.lower().split()[0] == prefix + "shell":
             python = '```py\n{}\n```'
-            cmd = bytes(message.content.replace(prefix+'py', "", 1), "utf-8").decode("unicode_escape").strip()
+            cmd = bytes(message.content.replace(prefix+'shell', "", 1), "utf-8").decode("unicode_escape").strip()
             try:
                 result = subprocess.getoutput(cmd)
             except Exception as e:
@@ -954,7 +912,6 @@ async def on_message(message):
             end = [result[i:i+1900] for i in range(0, len(result), 1900)]
             for i in end:
                 await client.send_message(message.channel, python.format(i))
-
 
         if message.content.lower().split()[0] == prefix + "stop":
             await client.send_message(message.channel, "Hammer Time!")
@@ -1018,7 +975,7 @@ async def on_message(message):
     if message.content.lower().startswith("good boy"):
         await client.send_message(message.channel, "Thanks!")
 
-    if message.content.lower()== ("wew"):
+    if message.content.lower() == ("wew"):
         if "WEW" in message.content:
             await client.send_message(message.channel, "LAD")
             return
@@ -1074,6 +1031,7 @@ async def on_server_remove(server):
     await client.send_message(discord.Object(id='222828628369604609'),
                               "**__Left {}__**".format(server.name))
 
+
 @client.event
 async def on_ready():
     print('------')
@@ -1083,30 +1041,35 @@ async def on_ready():
     print(client.user.id)
     print("https://discordapp.com/oauth2/authorize?&client_id=" +
           client.user.id + "&scope=bot&permissions=3688992")
-    await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
-    await client.send_message(discord.Object(id='222828628369604609'), "Bot Started")
-    await client.send_message(discord.Object(id='222828628369604609'),
-                              "Took {} to start"
-                              .format(str(datetime.now() - start)))
-    print("Took {} to start".format(str(datetime.now() - start)))
-    print('------')
-    updates = []
-    updated = 0
-    for server in client.servers:
-        await create_server(server)
-    for server in client.servers:
-        updates.append(bot.update_server(server))
-    for update in updates:
-        if not update.startswith("Nothing to update"):
-            await client.send_message(discord.Object(id='222828628369604609'), update)
-            updated += 1
-    if not updates:
-        await client.send_message(discord.Object(id='222828628369604609'), "All servers have up to date configs")
+    if not bot.started:
+        await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
+        await client.send_message(discord.Object(id='222828628369604609'), "Bot Started")
+        await client.send_message(discord.Object(id='222828628369604609'),
+                                  "Took {} to start"
+                                  .format(str(datetime.now() - start)))
+        print("Took {} to start".format(str(datetime.now() - start)))
+        print('------')
+        updates = []
+        updated = 0
+        for server in client.servers:
+            await create_server(server)
+        for server in client.servers:
+            updates.append(bot.update_server(server))
+        for update in updates:
+            if not update.startswith("Nothing to update"):
+                await client.send_message(discord.Object(id='222828628369604609'), update)
+                updated += 1
+        if not updates:
+            await client.send_message(discord.Object(id='222828628369604609'), "All servers have up to date configs")
+        else:
+            await client.send_message(discord.Object(id='222828628369604609'), "Updated {} configs".format(updated))
+        await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
+        await suggest_reset()
+        bot.started = True
     else:
-        await client.send_message(discord.Object(id='222828628369604609'), "Updated {} configs".format(updated))
-    await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
-    await suggest_reset()
+        await client.send_message(discord.Object(id='222828628369604609'), "Reconnected")
 
 if __name__ == "__main__":
+    Fun.bot = bot
     print("Starting...")
     client.run('token')

@@ -1,5 +1,9 @@
 import wikipedia
 import xkcd
+import random
+from cleverbot import Cleverbot
+
+bot = None
 
 
 async def wiki(query, sentences=3):
@@ -32,3 +36,37 @@ async def get_xkcd(number=0, random=False):
     info.append("***{0}***".format(comic.altText))
 
     return info
+
+
+async def fortune():
+    poss = ["It is certain",
+            "It is decidedly so",
+            "Without a doubt",
+            "Yes, definitely",
+            "You may rely on it",
+            "As I see it, yes",
+            "Most likely",
+            "Outlook good",
+            "Yes",
+            "Signs point to yes",
+            "Reply hazy try again",
+            "Ask again later",
+            "Better not tell you now",
+            "Cannot predict now",
+            "Concentrate and ask again",
+            "Don't count on it",
+            "My reply is no",
+            "My sources say no",
+            "Outlook not so good",
+            "Very doubtful"]
+
+    return poss[random.randint(0, 19)]
+
+
+async def convo_manager(check):
+    if check in bot.convos:
+        return bot.convos[check]
+    else:
+        # *Creates a conversation for them if not
+        bot.convos[check] = Cleverbot()
+        return bot.convos[check]
