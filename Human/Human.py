@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import discord
-from cleverbot import Cleverbot
 import yaml
 from gingerit.gingerit import GingerIt
 import Fun
@@ -9,7 +8,6 @@ from Utils import *
 
 import time  # *Switch all time to datetime
 from datetime import datetime
-import aiohttp
 import pickle
 import random
 import os
@@ -28,7 +26,7 @@ class Bot:
         self.author = '@Yu#9162'
         self.library = 'discord.py'
         self.source = 'https://github.com/Kyu/Human'
-        self.invite = "https://discordapp.com/oauth2/authorize?&client_id=210448501748924416&scope=bot&permissions=-1"
+        self.invite = "https://discordapp.com/oauth2/authorize?&client_id=210448501748924416&scope=bot&permissions=471198782"
         self.version = 'Beta0.8'
         self.config_name = 'config.yml'
         self.start = datetime.now()
@@ -42,14 +40,10 @@ class Bot:
         self.DATE_FORMAT = '%Y-%m-%d'
         self.log_name = self.start.strftime('%Y-%m-%d-%H-%M-%S') + ".log"
         self.log_dir = os.getcwd() + "/logs/" + self.log_name
-        self.commands = ('purge', 'blacklist', 'reload', 'say', 'roll', 'c',
-                         'flip', 'play', 'clear', 'py', 'stop',
-                         'todo', 'suggestion', '8ball', 'stats',
-                         'whosaid', 'case', 'reverse', 'settings', 'setting',
-                         'eval', 'grammar', 'meow', 'doggo', 'dog',
-                         'puppy', 'kitty', 'kitten', 'ping', 'g', 'mentions',
-                         'mention', 'mentioned', 'info', "invite", "kick",
-                         "ban", "suggest", "wiki", "wikipedia", "xkcd", "shell")
+        self.commands = ('purge', 'blacklist', 'reload', 'say', 'roll', 'c', 'flip', 'play', 'clear', 'py', 'stop', '8ball', 'stats',
+                         'whosaid', 'case', 'reverse', 'settings', 'setting', 'grammar', 'meow', 'doggo', 'dog', 'puppy', 'kitty', 'kitten',
+                         'ping', 'g', 'mentions', 'mention', 'mentioned', 'info', 'invite', 'kick', 'ban', 'suggest', 'wiki', 'wikipedia',
+                         'xkcd', 'shell', 'set', 'suggestion')
         self.suggest_timeout = {}
         self.allow_convos = {}
         self.loadConvos()
@@ -212,12 +206,12 @@ async def correctGrammar(text):
     return correctedgrammar
 
 
-async def getDoggo():
+def getDoggo():
     doggo = 'random.dog/ doggo'
     return doggo
 
 
-async def getKitty():
+def getKitty():
     kitty = 'random.cat/ kitty'
     return kitty
 
@@ -228,15 +222,30 @@ async def save_convo(obj):
     return
 
 
+async def send_feedback(message, type, input=False):
+    input = message.content if not input else input
+    embed = discord.Embed(description="")
+    embed.color = discord.Colour.blue()
+    embed.set_author(name=message.author, icon_url=message.author.avatar_url)
+    if message.server:
+        embed.add_field(name=message.server.name, value=message.server.id)
+        embed.add_field(name=message.channel.name, value=message.channel.id)
+    embed.timestamp = message.timestamp
+    embed.add_field(name=type, value=input, inline=False)
+    await client.send_message(discord.Object(id='240528124297740298'), embed=embed)
+
+
 async def bot_chat(channel, chatters=2):
     prompt = "Hi"
-    prefixes = [":speech_balloon:", ":thought_balloon:", ":cloud_lightning:", ":diamond_shape_with_a_dot_inside:", ":thinking:", ":sunglasses:", ":poop:", ":eye_in_speech_bubble:", ":speech_left:", ":eyes:", ":robot:", ":no_mouth:", ":globe_with_meridians:", ":capital_abcd:", ":interrobang:"]
+    prefixes = [":speech_balloon:", ":thought_balloon:", ":cloud_lightning:", ":diamond_shape_with_a_dot_inside:", ":thinking:",
+                ":sunglasses:", ":poop:", ":eye_in_speech_bubble:", ":speech_left:", ":eyes:", ":robot:", ":no_mouth:", ":globe_with_meridians:",
+                ":capital_abcd:", ":interrobang:"]
 
     if chatters > len(prefixes):
         return "Too much bots. Max is {}".format(len(prefixes))
 
     while bot.allow_convos[channel.id]:
-        for i in range(1, chatters+1):
+        for i in range(1, chatters + 1):
             pr = "{0}Chatter: {1}".format(channel.id, i)
             c = await Fun.convo_manager(pr)
             prompt = c.ask(prompt)
@@ -304,10 +313,9 @@ async def set(server, case, rule):
              'disabled': 'Channels where the bot doesn\'t talk at all',
              'default_roles': "The role(s) new users automatically get",
              "disabled_commands": "Commands disabled on the server",
-             "mod_log": "Channel where the bot logs mod actions"}
-            # "bot_commanders": "Users able to do bot level commands"}
+             "mod_log": "Channel where the bot logs mod actions"}  # "bot_commanders": "Users able to do bot level commands"}
 
-    if case == 'info':
+    if case == 'info' or case == 'help':
         if type(rule) is str and rule:
             return cases[rule]
         else:
@@ -338,7 +346,7 @@ async def set(server, case, rule):
         if case == 'silent' or case == 'disabled':
             try:
                 rule = rule.id
-            except:
+            except Exception:
                 pass
             if rule.isdigit():
                 if rule in config[server.id][case]:
@@ -435,6 +443,11 @@ async def on_message(message):
         prefix = bot.settings[message.server.id]['prefix']
 
     if message.author == client.user:
+        if message.channel.is_private:
+            if message.content == bot.helpText().format(prefix, message.server):
+                return
+            else:
+                pass
         await take_log(message)
 
     if message.author.bot:
@@ -442,7 +455,9 @@ async def on_message(message):
 
     for i in bot.commands:
         if message.content.lower().split()[0] == prefix + i:
-            if i in bot.settings[message.server.id]["disabled_commands"]:
+            if message.channel.is_private and i != "help":
+                return
+            if i in bot.settings[message.server.id]["disabled_commands"] and (not i.startswith("set")):
                 return
             if (message.channel.id in bot.settings[message.server.id]['disabled']) and (not i.startswith('set')):
                 return
@@ -458,7 +473,7 @@ async def on_message(message):
         await client.send_message(message.author,
                                   bot.helpText().format(prefix, message.server))
         await client.send_message(message.channel,
-                                        """Help Sent to {}!""".format(message.author.mention))
+                                  "Help Sent to {}!".format(message.author.mention))
 
     if client.user.mention in message.content:
         await take_log(message)
@@ -547,7 +562,7 @@ async def on_message(message):
         await client.send_message(message.channel, bot.info())
 
     if message.content.lower().split()[0] == prefix + 'ping':
-        pong = await client.send_message(message.channel, "Ow!")
+        pong = await client.send_message(message.channel, ":ping_pong:")
         ping = pong.timestamp - message.timestamp
         await client.edit_message(pong,
                                   "Response took {}s"
@@ -570,26 +585,19 @@ async def on_message(message):
             bot.suggest_timeout[message.author.id] = 0
 
         bot.suggest_timeout[message.author.id] += 1
-        embed = discord.Embed(description="")
-        embed.color = discord.Colour.blue()
-        embed.set_author(name=message.author, icon_url=message.author.avatar_url)
-        embed.add_field(name=message.server.name, value=message.server.id)
-        embed.add_field(name=message.channel.name, value=message.channel.id)
-        embed.timestamp = message.timestamp
-        embed.add_field(name="Suggestion", value=await args.toString() + "\n", inline=False)
-        await client.send_message(discord.Object(id='240528124297740298'), embed=embed)
+        await send_feedback(message, "Suggestion", input=await args.toString() + "\n")
 
     if (message.content.lower().split()[0] == prefix + 'cat' or
             message.content.lower().split()[0] == prefix + 'meow' or
             message.content.lower().split()[0] == prefix + 'kitten' or
             message.content.lower().split()[0] == prefix + 'kitty'):
-        await client.send_message(message.channel, await getKitty())
+        await client.send_message(message.channel, getKitty())
 
     if (message.content.lower().split()[0] == prefix + 'pupper' or
             message.content.lower().split()[0] == prefix + 'doggo' or
             message.content.lower().split()[0] == prefix + 'dog' or
             message.content.lower().split()[0] == prefix + 'puppy'):
-        await client.send_message(message.channel, await getDoggo())
+        await client.send_message(message.channel, getDoggo())
 
     # *Finish this
     if message.content.lower().split()[0] == prefix + "urban":
@@ -680,8 +688,7 @@ async def on_message(message):
                                        "`optional reason`"))
             return
         try:
-            to_remove = message.server.get_member(
-                        re.findall(r'<@!?([0-9]+)>', args[0])[0])
+            to_remove = message.server.get_member(re.findall(r'<@!?([0-9]+)>', args[0])[0])
         except IndexError:
             await client.send_message(message.channel, "User not found")
             return
@@ -719,8 +726,7 @@ async def on_message(message):
             return
 
         try:
-            to_remove = message.server.get_member(
-                        re.findall(r'<@!?([0-9]+)>', args[0])[0])
+            to_remove = message.server.get_member(re.findall(r'<@!?([0-9]+)>', args[0])[0])
         except IndexError:
             await client.send_message(message.channel, "User not found")
             return
@@ -754,11 +760,12 @@ async def on_message(message):
         await client.send_message(message.channel, reason)
 
     # *Make this section more user friendly
-    if (message.channel.permissions_for(message.author).manage_server
-            or message.author.id == '142510125255491584'):
+    if (message.channel.permissions_for(message.author).manage_server or message.author.id == '142510125255491584'):
         if message.content.lower().split()[0] == prefix + 'settings':
             if args is None:
-                return  # *Show all settings
+                await client.send_message(message.channel, await set(message.server, "view", await Args(args[1:]).toString()))
+            elif args[0] == "info" or args[0] == "help":
+                await client.send_message(message.channel, await set(message.server, args[0], await Args(args[1:]).toString()))
             else:
                 try:
                     await client.send_message(message.channel, bot.settings[message.server.id][args[0]])
@@ -767,10 +774,10 @@ async def on_message(message):
                                               "Invalid setting argument")
             return
 
-        if message.content.lower().split()[0] == prefix + 'setting':
+        if message.content.lower().split()[0] == prefix + 'set':
             if args is None:
                 await client.send_message(message.channel,
-                                          "Use {}setting info to see what you can set"
+                                          "Use {}settings help to see what you can set"
                                           .format(prefix))
                 return
             _set = await Args(args[1:]).toString()
@@ -781,7 +788,6 @@ async def on_message(message):
                 else:
                     await client.send_message(message.channel, await set(message.server, args[0], message.channel))
             except Exception as e:
-                print("Setting error reeeeeeeee:")
                 print(type(e).__name__ + ': ' + str(e))
 
     if (message.channel.permissions_for(message.author).manage_server or
@@ -802,9 +808,7 @@ async def on_message(message):
                     deleted += 1
 
             if deleted:
-                msg = await client.send_message(message.channel,
-                                                "Deleted {} of my messages"
-                                                 .format(deleted))
+                msg = await client.send_message(message.channel, "Deleted {} of my messages".format(deleted))
                 await asyncio.sleep(10)
                 await client.delete_message(msg)
 
@@ -817,10 +821,10 @@ async def on_message(message):
                 await client.send_message(message.channel, "Invalid arg {}"
                                           .format(args[0]))
                 return
-            except IndexError:
+            except TypeError:
                 num = bot.settings[message.server.id]['clear']
-            finally:
-                num = 10000 if num > 9999 else num
+
+            num = 10000 if num > 9999 else num
 
             if args and len(args) >= 2:
                 to_delete = message.server.get_member(
@@ -909,7 +913,7 @@ async def on_message(message):
                 return
 
             result = str(result)
-            end = [result[i:i+1900] for i in range(0, len(result), 1900)]
+            end = [result[i:i + 1900] for i in range(0, len(result), 1900)]
             for i in end:
                 await client.send_message(message.channel, python.format(i))
 
@@ -917,25 +921,11 @@ async def on_message(message):
             await client.send_message(message.channel, "Hammer Time!")
             await client.logout()
 
-    if message.channel.id in bot.settings[message.server.id]['silent']:
+    if message.channel.is_private or message.channel.id in bot.settings[message.server.id]['silent']:
         return
 
     # *Regex when
-    if "ruka" in message.content.lower():
-        await client.send_message(message.channel,
-                                  "_Did you mean_: {}"
-                                  .format(message.content.lower()
-                                          .replace("ruka", "Nuka")))
-
-    if 'oshit' in message.content.lower():
-        if 'OSHIT' in message.content:
-            await client.send_message(message.channel, "WADDUP")
-            return
-
-        await client.send_message(message.channel, "waddup")
-
-    if ('cyka' in message.content.lower() and
-            'blyat' not in message.content.lower()):
+    if message.content.lower() == "cyka":
         await client.send_message(message.channel, 'Блять')
 
     if message.content.lower() == 'kek':
@@ -943,15 +933,7 @@ async def on_message(message):
             await client.send_message(message.channel,
                                       "Did you know that kek backwards is kek?"
                                       )
-        return
-
-    if ('ayy' in message.content.lower() and
-            'lmao' not in message.content.lower()):
-        await client.send_message(message.channel, "lmao")
-
-    if ('lmao' in message.content.lower() and
-            'ayy' not in message.content.lower()):
-        await client.send_message(message.channel, "ayy")
+    return
 
     if 'kill all bots' in message.content.lower():
         await client.send_message(message.channel,
@@ -960,22 +942,22 @@ async def on_message(message):
         await asyncio.sleep(5)
         await client.send_message(message.channel, "Ddox beginning..")
 
-    if '/o/' in message.content.lower():
+    if message.content.lower() == '/o/':
         await client.send_message(message.channel, "\\o\\")
 
-    if '\\o\\' in message.content.lower():
+    if message.content.lower() == '\\o\\':
         await client.send_message(message.channel, "/o/")
 
-    if '/o\\' in message.content.lower():
+    if message.content.lower() == '/o\\':
         await client.send_message(message.channel, '\\o/')
 
-    if '\\o/' in message.content.lower():
+    if message.content.lower() == '\\o/':
         await client.send_message(message.channel, '/o\\')
 
     if message.content.lower().startswith("good boy"):
         await client.send_message(message.channel, "Thanks!")
 
-    if message.content.lower() == ("wew"):
+    if message.content.lower() == "wew":
         if "WEW" in message.content:
             await client.send_message(message.channel, "LAD")
             return
@@ -985,6 +967,8 @@ async def on_message(message):
 @client.event
 async def on_member_join(member):
     if member == client.user:
+        return
+    if member.bot:
         return
 
     if not bot.settings[member.server.id]['default_roles']:
@@ -1030,6 +1014,15 @@ Icon: {0.icon_url}""".format(server, bool(server.mfa_level)))
 async def on_server_remove(server):
     await client.send_message(discord.Object(id='222828628369604609'),
                               "**__Left {}__**".format(server.name))
+    await client.send_message(server.owner, ("I have been removed from {}"
+                                             "Do you have any feedback to give on your experience with the bot"
+                                             "(suggestions, improvements?)").format(server.name))
+    resp = await client.wait_for_message(timeout=7200, author=server.owner)
+    if not resp.content:
+        return
+    else:
+        await send_feedback(resp, "Feedback")
+
 
 
 @client.event
@@ -1064,7 +1057,7 @@ async def on_ready():
         else:
             await client.send_message(discord.Object(id='222828628369604609'), "Updated {} configs".format(updated))
         await client.send_message(discord.Object(id='222828628369604609'), "**-----**")
-        await suggest_reset()
+        await client.loop.create_task(suggest_reset())
         bot.started = True
     else:
         await client.send_message(discord.Object(id='222828628369604609'), "Reconnected")
@@ -1072,4 +1065,4 @@ async def on_ready():
 if __name__ == "__main__":
     Fun.bot = bot
     print("Starting...")
-    client.run('token')
+    client.run('toke')
