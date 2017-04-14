@@ -2,11 +2,23 @@ import wikipedia
 import xkcd
 import random
 from cleverbot import Cleverbot
+import aiohttp
 
 bot = None
 
 
-async def wiki(query, sentences=3):
+async def get_kitty():
+    api = ["http://random.cat/meow", "http://thecatapi.com/api/images/get"]
+    method = random.choice(api)
+    async with aiohttp.get(method) as req:
+        if method == api[0]:
+            response = await req.json()
+            return response['file']
+        else:
+            return req.url
+
+
+def wiki(query, sentences=3):
     if not query:
         return "Query must not be empty"
     try:
@@ -18,7 +30,7 @@ async def wiki(query, sentences=3):
     return wik
 
 
-async def get_xkcd(number=0, random=False):
+def get_xkcd(number=0, random=False):
     if random:
         comic = xkcd.getRandomComic()
     elif number > 0 and number < (xkcd.getLatestComicNum() + 1):
@@ -38,7 +50,7 @@ async def get_xkcd(number=0, random=False):
     return info
 
 
-async def fortune():
+def fortune():
     poss = ["It is certain",
             "It is decidedly so",
             "Without a doubt",
@@ -63,7 +75,7 @@ async def fortune():
     return poss[random.randint(0, 19)]
 
 
-async def convo_manager(check):
+def convo_manager(check):
     if check in bot.convos:
         return bot.convos[check]
     else:
